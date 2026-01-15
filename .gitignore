@@ -1,0 +1,25 @@
+# Build artifacts
+*.zip
+build/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Claude/AI
+.claude*
+.grepai*
+
+# Composer
+/vendor/
+
+# Node (if used)
+node_modules/
