@@ -1,16 +1,102 @@
 services:
-  # Services Symfony pour PS8/PS9
-  # Décommenter et adapter si vous avez besoin de services Symfony
-  #
-  # IMPORTANT pour PS8: Ne pas utiliser _defaults avec autowire si vous avez
-  # des services avec "parent:" - cela cause des conflits.
-
   _defaults:
-    public: false
+    public: true
+    autowire: true
+    autoconfigure: true
 
-  # Exemple de service personnalisé:
-  # PublikoModuleBoilerplate\Service\MyService:
-  #   class: PublikoModuleBoilerplate\Service\MyService
-  #   autowire: true
-  #   autoconfigure: true
-  #   public: true
+  # ==========================================================================
+  # CONTROLLER (PS9+)
+  # ==========================================================================
+  PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController:
+    class: PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController
+    tags: ['controller.service_arguments']
+
+  # ==========================================================================
+  # GRID COMPONENTS (PS9+)
+  # ==========================================================================
+
+  # Grid Definition Factory
+  PublikoModuleBoilerplate\Grid\Definition\Factory\BoilerplateItemGridDefinitionFactory:
+    class: PublikoModuleBoilerplate\Grid\Definition\Factory\BoilerplateItemGridDefinitionFactory
+    parent: 'prestashop.core.grid.definition.factory.abstract_grid_definition'
+
+  # Grid Query Builder
+  PublikoModuleBoilerplate\Grid\Query\BoilerplateItemQueryBuilder:
+    class: PublikoModuleBoilerplate\Grid\Query\BoilerplateItemQueryBuilder
+    arguments:
+      - '@doctrine.dbal.default_connection'
+      - '%database_prefix%'
+      - '@prestashop.core.grid.query.doctrine_search_criteria_applicator'
+      - '@=service("prestashop.adapter.legacy.context").getLanguage().id'
+      - '@=service("prestashop.adapter.legacy.context").getContext().shop.id'
+
+  # Grid Data Factory
+  prestashop.module.publikomoduleboilerplate.grid.data_factory.boilerplate_item:
+    class: PrestaShop\PrestaShop\Core\Grid\Data\Factory\DoctrineGridDataFactory
+    arguments:
+      - '@PublikoModuleBoilerplate\Grid\Query\BoilerplateItemQueryBuilder'
+      - '@prestashop.core.hook.dispatcher'
+      - '@prestashop.core.grid.query.doctrine_query_parser'
+      - 'boilerplate_item'
+
+  # Grid Factory (main entry point)
+  prestashop.module.publikomoduleboilerplate.grid.factory.boilerplate_item:
+    class: PrestaShop\PrestaShop\Core\Grid\GridFactory
+    arguments:
+      - '@PublikoModuleBoilerplate\Grid\Definition\Factory\BoilerplateItemGridDefinitionFactory'
+      - '@prestashop.module.publikomoduleboilerplate.grid.data_factory.boilerplate_item'
+      - '@prestashop.core.grid.filter.form_factory'
+      - '@prestashop.core.hook.dispatcher'
+
+  # ==========================================================================
+  # FORM COMPONENTS (PS9+)
+  # ==========================================================================
+
+  # Form Type
+  PublikoModuleBoilerplate\Form\BoilerplateItemType:
+    class: PublikoModuleBoilerplate\Form\BoilerplateItemType
+    parent: 'form.type.translatable.aware'
+    tags:
+      - { name: form.type }
+
+  # Form Data Provider
+  PublikoModuleBoilerplate\Form\BoilerplateItemDataProvider:
+    class: PublikoModuleBoilerplate\Form\BoilerplateItemDataProvider
+
+  # Form Data Handler
+  PublikoModuleBoilerplate\Form\BoilerplateItemDataHandler:
+    class: PublikoModuleBoilerplate\Form\BoilerplateItemDataHandler
+
+  # Form Builder
+  prestashop.module.publikomoduleboilerplate.form.builder.boilerplate_item:
+    class: PrestaShop\PrestaShop\Core\Form\IdentifiableObject\Builder\FormBuilder
+    arguments:
+      - '@form.factory'
+      - '@prestashop.core.hook.dispatcher'
+      - '@PublikoModuleBoilerplate\Form\BoilerplateItemDataProvider'
+      - 'PublikoModuleBoilerplate\Form\BoilerplateItemType'
+
+  # Form Handler
+  prestashop.module.publikomoduleboilerplate.form.handler.boilerplate_item:
+    class: PrestaShop\PrestaShop\Core\Form\IdentifiableObject\Handler\FormHandler
+    arguments:
+      - '@PublikoModuleBoilerplate\Form\BoilerplateItemDataHandler'
+      - '@prestashop.core.hook.dispatcher'
+
+  # ==========================================================================
+  # MIGRATION SERVICE
+  # ==========================================================================
+
+  PublikoModuleBoilerplate\Database\MigrationManager:
+    class: PublikoModuleBoilerplate\Database\MigrationManager
+    arguments:
+      - '%kernel.project_dir%/modules/publikomoduleboilerplate'
+
+  # ==========================================================================
+  # ALIASES (for controller injection)
+  # ==========================================================================
+
+  # These aliases allow type-hinted injection in controllers
+  PrestaShop\PrestaShop\Core\Grid\GridFactoryInterface $boilerplateItemGridFactory: '@prestashop.module.publikomoduleboilerplate.grid.factory.boilerplate_item'
+  PrestaShop\PrestaShop\Core\Form\IdentifiableObject\Builder\FormBuilderInterface $boilerplateItemFormBuilder: '@prestashop.module.publikomoduleboilerplate.form.builder.boilerplate_item'
+  PrestaShop\PrestaShop\Core\Form\IdentifiableObject\Handler\FormHandlerInterface $boilerplateItemFormHandler: '@prestashop.module.publikomoduleboilerplate.form.handler.boilerplate_item'

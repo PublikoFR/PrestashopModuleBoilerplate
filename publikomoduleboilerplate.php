@@ -22,8 +22,15 @@ if (!defined('_PS_VERSION_')) {
 // Load PSR-4 autoloader
 require_once __DIR__ . '/autoload.php';
 
+use PublikoModuleBoilerplate\Database\MigrationManager;
+
 class Publikomoduleboilerplate extends Module
 {
+    /**
+     * @var MigrationManager|null
+     */
+    private $migrationManager;
+
     public function __construct()
     {
         $this->name = 'publikomoduleboilerplate';
@@ -44,15 +51,42 @@ class Publikomoduleboilerplate extends Module
     }
 
     /**
+     * Get Migration Manager instance
+     */
+    protected function getMigrationManager(): MigrationManager
+    {
+        if ($this->migrationManager === null) {
+            $this->migrationManager = new MigrationManager(__DIR__);
+        }
+
+        return $this->migrationManager;
+    }
+
+    /**
+     * Check if running on PrestaShop 9+
+     */
+    public function isPs9(): bool
+    {
+        return version_compare(_PS_VERSION_, '9.0.0', '>=');
+    }
+
+    /**
      * Module installation
      */
     public function install()
     {
-        return parent::install()
+        $result = parent::install()
             && $this->installDb()
             && $this->registerHook('displayHeader')
             && $this->registerHook('displayBackOfficeHeader')
             && $this->installAdminTab();
+
+        if ($result) {
+            // Initialize DB version on fresh install
+            $this->getMigrationManager()->setCurrentVersion($this->version);
+        }
+
+        return $result;
     }
 
     /**
@@ -60,9 +94,54 @@ class Publikomoduleboilerplate extends Module
      */
     public function uninstall()
     {
+        // Clean up migration version config
+        Configuration::deleteByName('BOILERPLATE_DB_VERSION');
+
         return $this->uninstallAdminTab()
             && $this->uninstallDb()
             && parent::uninstall();
+    }
+
+    /**
+     * Module upgrade
+     *
+     * Called automatically by PrestaShop when module version changes.
+     * Runs all pending database migrations.
+     *
+     * @param string $oldVersion Previous installed version
+     * @return bool
+     */
+    public function upgrade($oldVersion)
+    {
+        $migrationManager = $this->getMigrationManager();
+
+        // Check for pending migrations
+        if (!$migrationManager->hasPendingMigrations($this->version)) {
+            return true;
+        }
+
+        try {
+            $results = $migrationManager->runMigrations($this->version);
+
+            // Log successful migrations
+            foreach ($results as $version => $result) {
+                if ($result['success']) {
+                    PrestaShopLogger::addLog(
+                        sprintf('%s: Migration %s applied (%d queries)', $this->name, $version, $result['queries']),
+                        1
+                    );
+                }
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            PrestaShopLogger::addLog(
+                sprintf('%s: Migration failed - %s', $this->name, $e->getMessage()),
+                3
+            );
+
+            return false;
+        }
     }
 
     /**

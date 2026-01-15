@@ -1,0 +1,79 @@
+# Routes for PrestaShop 9+
+#
+# These routes define the Symfony routing for the admin controller.
+# They will be automatically loaded by PrestaShop 9 when the module is enabled.
+#
+# For PS 1.7-8, the legacy AdminBoilerplateItemsController is used instead.
+
+admin_boilerplate_items_index:
+  path: /boilerplate-items
+  methods: [GET]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::indexAction'
+    _legacy_controller: AdminBoilerplateItems
+    _legacy_link: AdminBoilerplateItems
+
+admin_boilerplate_items_create:
+  path: /boilerplate-items/new
+  methods: [GET, POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::createAction'
+    _legacy_controller: AdminBoilerplateItems
+    _legacy_link: AdminBoilerplateItems:add
+
+admin_boilerplate_items_edit:
+  path: /boilerplate-items/{itemId}/edit
+  methods: [GET, POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::editAction'
+    _legacy_controller: AdminBoilerplateItems
+    _legacy_link: AdminBoilerplateItems:update
+  requirements:
+    itemId: \d+
+
+admin_boilerplate_items_delete:
+  path: /boilerplate-items/{itemId}/delete
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::deleteAction'
+    _legacy_controller: AdminBoilerplateItems
+    _legacy_link: AdminBoilerplateItems:delete
+  requirements:
+    itemId: \d+
+
+admin_boilerplate_items_toggle_status:
+  path: /boilerplate-items/{itemId}/toggle-status
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::toggleStatusAction'
+    _legacy_controller: AdminBoilerplateItems
+  requirements:
+    itemId: \d+
+
+admin_boilerplate_items_bulk_enable:
+  path: /boilerplate-items/bulk-enable
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::bulkEnableAction'
+    _legacy_controller: AdminBoilerplateItems
+
+admin_boilerplate_items_bulk_disable:
+  path: /boilerplate-items/bulk-disable
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::bulkDisableAction'
+    _legacy_controller: AdminBoilerplateItems
+
+admin_boilerplate_items_bulk_delete:
+  path: /boilerplate-items/bulk-delete
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::bulkDeleteAction'
+    _legacy_controller: AdminBoilerplateItems
+
+admin_boilerplate_items_update_position:
+  path: /boilerplate-items/update-position
+  methods: [POST]
+  defaults:
+    _controller: 'PublikoModuleBoilerplate\Controller\Admin\BoilerplateItemController::updatePositionAction'
+    _legacy_controller: AdminBoilerplateItems

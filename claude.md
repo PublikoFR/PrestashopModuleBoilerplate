@@ -447,10 +447,316 @@ Include in each module:
 - PHP 7.2+ type annotations
 - Explanations for complex logic
 
+## PrestaShop 9 Compatibility (Symfony Architecture)
+
+### Overview
+
+PrestaShop 9 uses a modern Symfony-based architecture. This boilerplate supports **both** legacy (PS 1.7-8) and modern (PS 9+) approaches.
+
+### File Structure for PS9
+
+```
+src/
+├── Controller/
+│   └── Admin/
+│       └── BoilerplateItemController.php    # Symfony controller
+├── Grid/
+│   ├── Definition/
+│   │   └── Factory/
+│   │       └── BoilerplateItemGridDefinitionFactory.php
+│   └── Query/
+│       └── BoilerplateItemQueryBuilder.php
+├── Form/
+│   ├── BoilerplateItemType.php              # Symfony form type
+│   ├── BoilerplateItemDataProvider.php      # Form data provider
+│   └── BoilerplateItemDataHandler.php       # Form data handler
+└── Database/
+    └── MigrationManager.php                 # DB migration system
+config/
+├── services.yml                             # Symfony services
+└── routes.yml                               # Symfony routes
+```
+
+### Services Configuration (config/services.yml)
+
+```yaml
+services:
+  _defaults:
+    public: true
+    autowire: true
+    autoconfigure: true
+
+  # Controller
+  MyModule\Controller\Admin\MyController:
+    tags: ['controller.service_arguments']
+
+  # Grid Definition
+  MyModule\Grid\Definition\Factory\MyGridDefinitionFactory:
+    parent: 'prestashop.core.grid.definition.factory.abstract_grid_definition'
+
+  # Grid Query Builder
+  MyModule\Grid\Query\MyQueryBuilder:
+    arguments:
+      - '@doctrine.dbal.default_connection'
+      - '%database_prefix%'
+      - '@prestashop.core.grid.query.doctrine_search_criteria_applicator'
+      - '@=service("prestashop.adapter.legacy.context").getLanguage().id'
+      - '@=service("prestashop.adapter.legacy.context").getContext().shop.id'
+```
+
+### Routes Configuration (config/routes.yml)
+
+```yaml
+admin_my_items_index:
+  path: /my-items
+  methods: [GET]
+  defaults:
+    _controller: 'MyModule\Controller\Admin\MyController::indexAction'
+    _legacy_controller: AdminMyItems
+    _legacy_link: AdminMyItems
+
+admin_my_items_create:
+  path: /my-items/new
+  methods: [GET, POST]
+  defaults:
+    _controller: 'MyModule\Controller\Admin\MyController::createAction'
+    _legacy_controller: AdminMyItems
+```
+
+### Controller with AdminSecurity (PS9+)
+
+```php
+use PrestaShopBundle\Controller\Admin\PrestaShopAdminController;
+use PrestaShopBundle\Security\Attribute\AdminSecurity;
+
+class MyController extends PrestaShopAdminController
+{
+    #[AdminSecurity("is_granted('read', request.get('_legacy_controller'))")]
+    public function indexAction(
+        Request $request,
+        GridFactoryInterface $myGridFactory
+    ): Response {
+        $grid = $myGridFactory->getGrid(
+            $this->buildFiltersFromRequest($request, 'my_grid')
+        );
+
+        return $this->render('@Modules/mymodule/views/templates/admin/ps9/index.html.twig', [
+            'grid' => $this->presentGrid($grid),
+        ]);
+    }
+}
+```
+
+### Version Detection
+
+```php
+// In main module file
+public function isPs9(): bool
+{
+    return version_compare(_PS_VERSION_, '9.0.0', '>=');
+}
+
+// Usage
+if ($this->isPs9()) {
+    // Use Symfony routing
+} else {
+    // Use legacy controller
+}
+```
+
+---
+
+## Database Migrations
+
+### Why Migrations?
+
+When users purchase and install your module, they have data in the database. When you release an update with schema changes, you **MUST NOT** lose their data. The migration system handles this safely.
+
+### Migration System Overview
+
+```
+sql/
+├── install.sql                 # Initial schema (fresh install)
+├── uninstall.sql               # Cleanup on uninstall
+└── migrations/
+    ├── 1.1.0.php               # Migration to v1.1.0
+    ├── 1.1.0.rollback.php      # Rollback for v1.1.0
+    ├── 1.2.0.php               # Migration to v1.2.0
+    ├── 1.2.0.rollback.php      # Rollback for v1.2.0
+    └── index.php               # Security file
+```
+
+### How Migrations Work
+
+1. **Fresh Install**: Creates tables from `installDb()`, sets version to current
+2. **Upgrade**: PrestaShop calls `upgrade($oldVersion)` → runs pending migrations
+3. **Version Tracking**: `MODULENAME_DB_VERSION` config stores current DB version
+
+### Creating a Migration File
+
+**File**: `sql/migrations/{version}.php`
+
+```php
+<?php
+/**
+ * Migration 1.1.0
+ *
+ * Description of changes
+ */
+
+return [
+    // Use PREFIX_ placeholder (replaced with actual DB prefix)
+    "ALTER TABLE `PREFIX_mymodule_item`
+     ADD COLUMN IF NOT EXISTS `slug` VARCHAR(255) DEFAULT NULL
+     AFTER `position`",
+
+    "CREATE INDEX IF NOT EXISTS `idx_slug`
+     ON `PREFIX_mymodule_item` (`slug`)",
+];
+```
+
+### Migration Best Practices
+
+```php
+// ✓ GOOD: Safe operations
+"ALTER TABLE `PREFIX_table` ADD COLUMN IF NOT EXISTS `col` VARCHAR(255)"
+"CREATE INDEX IF NOT EXISTS `idx_name` ON `PREFIX_table` (`col`)"
+"ALTER TABLE `PREFIX_table` MODIFY COLUMN `col` VARCHAR(512)"
+
+// ✗ BAD: Dangerous operations
+"DROP COLUMN `col`"              // Data loss!
+"TRUNCATE TABLE `PREFIX_table`"  // Data loss!
+"DROP TABLE `PREFIX_table`"      // Data loss!
+```
+
+### Migration Guidelines
+
+| Rule | Description |
+|------|-------------|
+| **One change per query** | Easier error handling and debugging |
+| **Use IF NOT EXISTS** | Safe re-runs, idempotent operations |
+| **PREFIX_ placeholder** | Replaced with actual `_DB_PREFIX_` |
+| **Create rollback file** | For reversible changes |
+| **Test thoroughly** | On fresh install AND upgrade scenarios |
+| **Document changes** | Comments explaining why |
+
+### Rollback Files (Optional but Recommended)
+
+**File**: `sql/migrations/{version}.rollback.php`
+
+```php
+<?php
+return [
+    "DROP INDEX IF EXISTS `idx_slug` ON `PREFIX_mymodule_item`",
+    "ALTER TABLE `PREFIX_mymodule_item` DROP COLUMN IF EXISTS `slug`",
+];
+```
+
+### Integration in Main Module
+
+```php
+use MyModule\Database\MigrationManager;
+
+class MyModule extends Module
+{
+    private $migrationManager;
+
+    protected function getMigrationManager(): MigrationManager
+    {
+        if ($this->migrationManager === null) {
+            $this->migrationManager = new MigrationManager(__DIR__);
+        }
+        return $this->migrationManager;
+    }
+
+    public function install()
+    {
+        $result = parent::install() && $this->installDb();
+
+        if ($result) {
+            // Set initial DB version
+            $this->getMigrationManager()->setCurrentVersion($this->version);
+        }
+
+        return $result;
+    }
+
+    public function upgrade($oldVersion)
+    {
+        try {
+            $this->getMigrationManager()->runMigrations($this->version);
+            return true;
+        } catch (\Exception $e) {
+            PrestaShopLogger::addLog($e->getMessage(), 3);
+            return false;
+        }
+    }
+
+    public function uninstall()
+    {
+        Configuration::deleteByName('MYMODULE_DB_VERSION');
+        return parent::uninstall();
+    }
+}
+```
+
+### Common Migration Scenarios
+
+#### Adding a new column
+
+```php
+// Migration 1.1.0.php
+return [
+    "ALTER TABLE `PREFIX_mymodule_item`
+     ADD COLUMN IF NOT EXISTS `new_field` VARCHAR(255) DEFAULT NULL",
+];
+```
+
+#### Adding multilingual field
+
+```php
+// Migration 1.2.0.php
+return [
+    "ALTER TABLE `PREFIX_mymodule_item_lang`
+     ADD COLUMN IF NOT EXISTS `meta_title` VARCHAR(255) DEFAULT NULL",
+    "ALTER TABLE `PREFIX_mymodule_item_lang`
+     ADD COLUMN IF NOT EXISTS `meta_description` VARCHAR(512) DEFAULT NULL",
+];
+```
+
+#### Adding a new table
+
+```php
+// Migration 1.3.0.php
+return [
+    "CREATE TABLE IF NOT EXISTS `PREFIX_mymodule_category` (
+        `id_category` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+        `id_parent` INT(10) UNSIGNED DEFAULT 0,
+        `active` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
+        PRIMARY KEY (`id_category`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+];
+```
+
+#### Modifying column type (safe)
+
+```php
+// Migration 1.4.0.php
+return [
+    // Increase VARCHAR size (safe, no data loss)
+    "ALTER TABLE `PREFIX_mymodule_item`
+     MODIFY COLUMN `name` VARCHAR(512) NOT NULL",
+];
+```
+
+---
+
 ## Resources
 
 - PrestaShop 8 Documentation: https://devdocs.prestashop-project.org/8/
+- PrestaShop 9 Documentation: https://devdocs.prestashop-project.org/9/
 - Module Documentation: https://devdocs.prestashop-project.org/8/modules/
+- Grid Documentation: https://devdocs.prestashop-project.org/8/development/components/grid/
 - Coding Standards: https://devdocs.prestashop-project.org/8/development/coding-standards/
 - Context7: Always use to search in official documentation
 
