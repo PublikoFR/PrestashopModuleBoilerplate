@@ -71,10 +71,50 @@ class Publikomoduleboilerplate extends Module
     }
 
     /**
+     * Enable Symfony routes for PS9+
+     * Copies routes.yml.ps9 to routes.yml
+     */
+    protected function enablePs9Routes(): bool
+    {
+        $source = __DIR__ . '/config/routes.yml.ps9';
+        $dest = __DIR__ . '/config/routes.yml';
+
+        if (!file_exists($source)) {
+            return true; // No PS9 routes file, skip
+        }
+
+        if (file_exists($dest)) {
+            return true; // Already enabled
+        }
+
+        return copy($source, $dest);
+    }
+
+    /**
+     * Disable Symfony routes (for PS 1.7-8)
+     * Removes routes.yml if it exists
+     */
+    protected function disablePs9Routes(): bool
+    {
+        $routesFile = __DIR__ . '/config/routes.yml';
+
+        if (file_exists($routesFile)) {
+            return unlink($routesFile);
+        }
+
+        return true;
+    }
+
+    /**
      * Module installation
      */
     public function install()
     {
+        // Enable PS9 routes only on PrestaShop 9+
+        if ($this->isPs9()) {
+            $this->enablePs9Routes();
+        }
+
         $result = parent::install()
             && $this->installDb()
             && $this->registerHook('displayHeader')
@@ -96,6 +136,9 @@ class Publikomoduleboilerplate extends Module
     {
         // Clean up migration version config
         Configuration::deleteByName('BOILERPLATE_DB_VERSION');
+
+        // Clean up PS9 routes file
+        $this->disablePs9Routes();
 
         return $this->uninstallAdminTab()
             && $this->uninstallDb()
