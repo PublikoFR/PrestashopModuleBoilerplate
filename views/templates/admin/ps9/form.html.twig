@@ -1,0 +1,82 @@
+{#
+ * Admin Template PS9 - Form (Création/Édition)
+ *
+ * INSTRUCTIONS:
+ * 1. Ce template est utilisé pour PrestaShop 9+ avec les formulaires Symfony
+ * 2. Adapter les champs selon votre ObjectModel
+ * 3. Nécessite la configuration de Form/Type dans src/
+ *
+ * @author    Publiko
+ * @copyright Publiko
+ * @license   Commercial
+ #}
+
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            {{ form_start(form, {'attr': {'class': 'form', 'novalidate': 'novalidate'}}) }}
+
+            {# Section principale #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">settings</i>
+                        {{ 'General Settings'|trans({}, 'Admin.Global') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {# Champ Name (multilingue) #}
+                    <div class="form-group row">
+                        <label class="form-control-label col-lg-3 required">
+                            {{ 'Name'|trans({}, 'Admin.Global') }}
+                        </label>
+                        <div class="col-lg-9">
+                            {{ form_widget(form.name) }}
+                            {{ form_errors(form.name) }}
+                        </div>
+                    </div>
+
+                    {# Champ Description (multilingue) #}
+                    <div class="form-group row">
+                        <label class="form-control-label col-lg-3">
+                            {{ 'Description'|trans({}, 'Admin.Global') }}
+                        </label>
+                        <div class="col-lg-9">
+                            {{ form_widget(form.description) }}
+                            {{ form_errors(form.description) }}
+                        </div>
+                    </div>
+
+                    {# Champ Active #}
+                    <div class="form-group row">
+                        <label class="form-control-label col-lg-3">
+                            {{ 'Active'|trans({}, 'Admin.Global') }}
+                        </label>
+                        <div class="col-lg-9">
+                            {{ form_widget(form.active) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Boutons de soumission #}
+            <div class="card mt-4">
+                <div class="card-footer">
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ path('publiko_module_boilerplate_index') }}" class="btn btn-outline-secondary mr-2">
+                            {{ 'Cancel'|trans({}, 'Admin.Actions') }}
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="material-icons">save</i>
+                            {{ 'Save'|trans({}, 'Admin.Actions') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}

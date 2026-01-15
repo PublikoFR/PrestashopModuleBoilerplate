@@ -1,0 +1,30 @@
+{
+    "name": "publiko/moduleboilerplate",
+    "description": "Boilerplate for PrestaShop 1.7/8/9 module creation",
+    "type": "prestashop-module",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Publiko",
+            "email": "contact@publiko.fr"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "PublikoModuleBoilerplate\\": "src/"
+        },
+        "classmap": [
+            "classes/"
+        ],
+        "files": [
+            "autoload.php"
+        ]
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true
+    }
+}

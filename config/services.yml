@@ -1,0 +1,16 @@
+services:
+  # Services Symfony pour PS8/PS9
+  # Décommenter et adapter si vous avez besoin de services Symfony
+  #
+  # IMPORTANT pour PS8: Ne pas utiliser _defaults avec autowire si vous avez
+  # des services avec "parent:" - cela cause des conflits.
+
+  _defaults:
+    public: false
+
+  # Exemple de service personnalisé:
+  # PublikoModuleBoilerplate\Service\MyService:
+  #   class: PublikoModuleBoilerplate\Service\MyService
+  #   autowire: true
+  #   autoconfigure: true
+  #   public: true

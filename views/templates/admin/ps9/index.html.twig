@@ -1,0 +1,57 @@
+{#
+ * Admin Template PS9 - Index (Liste)
+ *
+ * INSTRUCTIONS:
+ * 1. Ce template est utilisé pour PrestaShop 9+ avec le système Symfony Grid
+ * 2. Adapter les traductions et le nom du module
+ * 3. Nécessite la configuration de Grid/Definition et Grid/Query dans src/
+ *
+ * @author    Publiko
+ * @copyright Publiko
+ * @license   Commercial
+ #}
+
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">list</i>
+                        {{ 'Items List'|trans({}, 'Modules.Publikomoduleboilerplate.Admin') }}
+                    </h3>
+                    <div class="card-header-toolbar">
+                        <a href="{{ path('publiko_module_boilerplate_create') }}" class="btn btn-primary">
+                            <i class="material-icons">add</i>
+                            {{ 'Add new item'|trans({}, 'Modules.Publikomoduleboilerplate.Admin') }}
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {# Utiliser le Grid PrestaShop #}
+                    {% include '@PrestaShop/Admin/Common/Grid/grid_panel.html.twig' with {'grid': grid} %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Bloc d'aide optionnel #}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-header-title">
+                        <i class="material-icons">help</i>
+                        {{ 'Help'|trans({}, 'Admin.Global') }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p>{{ 'This is a boilerplate admin page for PrestaShop 9.'|trans({}, 'Modules.Publikomoduleboilerplate.Admin') }}</p>
+                    <p>{{ 'To customize, edit the Grid definition and this template.'|trans({}, 'Modules.Publikomoduleboilerplate.Admin') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
