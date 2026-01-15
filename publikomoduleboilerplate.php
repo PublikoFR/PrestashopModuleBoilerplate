@@ -71,35 +71,38 @@ class Publikomoduleboilerplate extends Module
     }
 
     /**
-     * Enable Symfony routes for PS9+
-     * Copies routes.yml.ps9 to routes.yml
+     * Enable Symfony components for PS9+
+     * Copies routes.yml.ps9 and services.yml.ps9 to active files
      */
-    protected function enablePs9Routes(): bool
+    protected function enablePs9Components(): bool
     {
-        $source = __DIR__ . '/config/routes.yml.ps9';
-        $dest = __DIR__ . '/config/routes.yml';
+        $files = [
+            'routes.yml.ps9' => 'routes.yml',
+            'services.yml.ps9' => 'services.yml',
+        ];
 
-        if (!file_exists($source)) {
-            return true; // No PS9 routes file, skip
+        foreach ($files as $source => $dest) {
+            $sourcePath = __DIR__ . '/config/' . $source;
+            $destPath = __DIR__ . '/config/' . $dest;
+
+            if (file_exists($sourcePath) && !file_exists($destPath)) {
+                copy($sourcePath, $destPath);
+            }
         }
 
-        if (file_exists($dest)) {
-            return true; // Already enabled
-        }
-
-        return copy($source, $dest);
+        return true;
     }
 
     /**
-     * Disable Symfony routes (for PS 1.7-8)
-     * Removes routes.yml if it exists
+     * Restore minimal PS8 config files
      */
-    protected function disablePs9Routes(): bool
+    protected function disablePs9Components(): bool
     {
+        // Only remove routes.yml (services.yml stays minimal)
         $routesFile = __DIR__ . '/config/routes.yml';
 
         if (file_exists($routesFile)) {
-            return unlink($routesFile);
+            unlink($routesFile);
         }
 
         return true;
@@ -110,9 +113,9 @@ class Publikomoduleboilerplate extends Module
      */
     public function install()
     {
-        // Enable PS9 routes only on PrestaShop 9+
+        // Enable PS9 Symfony components only on PrestaShop 9+
         if ($this->isPs9()) {
-            $this->enablePs9Routes();
+            $this->enablePs9Components();
         }
 
         $result = parent::install()
@@ -137,8 +140,8 @@ class Publikomoduleboilerplate extends Module
         // Clean up migration version config
         Configuration::deleteByName('BOILERPLATE_DB_VERSION');
 
-        // Clean up PS9 routes file
-        $this->disablePs9Routes();
+        // Clean up PS9 components
+        $this->disablePs9Components();
 
         return $this->uninstallAdminTab()
             && $this->uninstallDb()
