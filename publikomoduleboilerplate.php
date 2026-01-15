@@ -267,7 +267,7 @@ class Publikomoduleboilerplate extends Module
         $tab->icon = 'description';
 
         foreach (Language::getLanguages(false) as $lang) {
-            $tab->name[$lang['id_lang']] = 'Boilerplate Items';
+            $tab->name[$lang['id_lang']] = 'Module Boilerplate';
         }
 
         return $tab->add();
