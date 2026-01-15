@@ -15,11 +15,13 @@ services:
   # GRID COMPONENTS (PS9+)
   # ==========================================================================
 
-  # Grid Definition Factory (explicit public required with parent)
+  # Grid Definition Factory (explicit attributes required with parent)
   PublikoModuleBoilerplate\Grid\Definition\Factory\BoilerplateItemGridDefinitionFactory:
     class: PublikoModuleBoilerplate\Grid\Definition\Factory\BoilerplateItemGridDefinitionFactory
     parent: 'prestashop.core.grid.definition.factory.abstract_grid_definition'
     public: true
+    autowire: false
+    autoconfigure: false
 
   # Grid Query Builder
   PublikoModuleBoilerplate\Grid\Query\BoilerplateItemQueryBuilder:
@@ -53,11 +55,13 @@ services:
   # FORM COMPONENTS (PS9+)
   # ==========================================================================
 
-  # Form Type (explicit public required with parent)
+  # Form Type (explicit attributes required with parent)
   PublikoModuleBoilerplate\Form\BoilerplateItemType:
     class: PublikoModuleBoilerplate\Form\BoilerplateItemType
     parent: 'form.type.translatable.aware'
     public: true
+    autowire: false
+    autoconfigure: false
     tags:
       - { name: form.type }
 
