@@ -252,30 +252,68 @@ protected function renderForm()
 
 - **ABSOLUTE PROHIBITION**: Never do `ALTER TABLE` on an existing PrestaShop table
 - **ALWAYS** create your own tables prefixed by the module name
+
+**⚠️ TOUJOURS créer une migration lors de modifications BDD une fois que le module a été rendu publi (dépassant la version 1.0.0) !**
+
+- **OBLIGATOIRE** : Créer un fichier de migration dans `sql/migrations/` pour TOUTE modification de schéma :
+  - Ajout d'une nouvelle table
+  - Ajout/modification/suppression d'une colonne
+  - Ajout/modification d'un index
+- **Format** : `sql/migrations/X.X.X.php` (version du module)
+- **Contenu** : Tableau de requêtes SQL avec `PREFIX_` remplacé automatiquement
+- **Raison** : Les utilisateurs ayant déjà installé le module n'auront PAS les nouvelles tables/colonnes sans migration !
+
+```php
+// sql/migrations/1.1.0.php
+return [
+    'CREATE TABLE IF NOT EXISTS `PREFIX_mymodule_newtable` (...)',
+    'ALTER TABLE `PREFIX_mymodule_data` ADD COLUMN `new_field` VARCHAR(255) AFTER `existing_field`',
+];
+```
 - **OPTIMIZATION**: Create the LEAST number of tables possible
   - Prefer one table with more columns rather than several small tables
   - Use `_lang` tables only if necessary for multilingual
   - Group related data in the same table when logical
 - **JOINS**: Use foreign keys (`id_product`, `id_customer`, etc.) to link to PrestaShop tables
 
-### Table naming examples
+### Table naming convention (Publiko modules)
+
+**Préfixe obligatoire** : `pko_` (pour Publiko) après le préfixe PrestaShop.
+
+Format : `{_DB_PREFIX_}pko_{nomtable}`
 
 ```
-✓ CORRECT:
-`ps_mymodule_config`
-`ps_mymodule_data`
-`ps_mymodule_data_lang`
+✓ CORRECT (modules Publiko):
+`ps_pko_siretverif_data`
+`ps_pko_siretverif_data_lang`
+`ps_pko_mymodule_config`
 
 ✗ INCORRECT:
-`ps_product` (modifying native table)
-`ps_mymodule_config`
-`ps_mymodule_config_parameters`
-`ps_mymodule_settings`
-→ These 3 tables could be just one!
+`ps_product` (table native modifiée)
+`ps_mymodule_data` (manque préfixe pko_)
+`ps_pko_config` + `ps_pko_settings` (2 tables au lieu d'une)
+```
+
+### Utilisation en PHP
+
+```php
+// Définir le préfixe Publiko
+const PKO_PREFIX = 'pko_';
+
+// Création de table
+$sql = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::PKO_PREFIX . 'mymodule_data` (...)';
+
+// Requête SELECT
+$result = Db::getInstance()->getValue(
+    'SELECT * FROM `' . _DB_PREFIX_ . 'pko_mymodule_data` WHERE id = ' . (int)$id
+);
 ```
 
 ### Installation
 ```php
+// Préfixe Publiko pour les tables
+const PKO_PREFIX = 'pko_';
+
 public function install()
 {
     return parent::install()
@@ -289,7 +327,8 @@ private function installDB()
 
     // Create the LEAST number of tables possible
     // Group related data in the same table
-    $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'mymodule_data` (
+    // Format: ps_pko_modulename_tablename
+    $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.self::PKO_PREFIX.'mymodule_data` (
         `id_data` int(11) NOT NULL AUTO_INCREMENT,
         `id_product` int(11) DEFAULT NULL,
         `id_customer` int(11) DEFAULT NULL,
@@ -304,7 +343,7 @@ private function installDB()
     ) ENGINE='._MYSQL_ENGINE_.' DEFAULT CHARSET=utf8;';
 
     // _lang table only if necessary
-    $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'mymodule_data_lang` (
+    $sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.self::PKO_PREFIX.'mymodule_data_lang` (
         `id_data` int(11) NOT NULL,
         `id_lang` int(11) NOT NULL,
         `name` varchar(255) NOT NULL,
@@ -331,7 +370,7 @@ public function uninstall()
 
 private function uninstallDB()
 {
-    $sql = 'DROP TABLE IF EXISTS `'._DB_PREFIX_.'mymodule_table`';
+    $sql = 'DROP TABLE IF EXISTS `'._DB_PREFIX_.self::PKO_PREFIX.'mymodule_data`';
     return Db::getInstance()->execute($sql);
 }
 ```
@@ -358,49 +397,53 @@ private function uninstallDB()
 </div>
 ```
 
-## Install Script (install.sh)
+## Build Script (build.sh)
 
-- The `install.sh` script handles module installation, synchronization, and building. It provides an interactive menu with arrow key navigation and CLI options.
-- When you init a project from this boilerplate, simply rename the variables in .env.install
-
-### Configuration for a New Module
-
-When creating a new module from this boilerplate, update these variables at the top of `install.sh`:
+A `build.sh` script must ALWAYS be created and kept up to date with the module structure:
 
 ```bash
-# =============================================================================
-# Configuration - À MODIFIER pour chaque nouveau module
-# =============================================================================
-PRESTASHOP_PATH="/path/to/your/prestashop"    # Path to local PrestaShop
-DOCKER_CONTAINER="your_container_name"         # Docker container name
-MODULE_NAME="yourmodulename"                   # Module technical name (no spaces)
+#!/bin/bash
+
+# Module name
+MODULE_NAME="mymodule"
+VERSION=$(grep "this->version" ${MODULE_NAME}.php | cut -d"'" -f4)
+ZIP_NAME="${MODULE_NAME}_v${VERSION}.zip"
+
+# Cleanup
+rm -f ${ZIP_NAME}
+
+# List of files and folders to include
+# IMPORTANT: Update this list if the structure changes
+zip -r ${ZIP_NAME} \
+    ${MODULE_NAME}.php \
+    index.php \
+    logo.png \
+    config.xml \
+    README.md \
+    translations/ \
+    views/ \
+    controllers/ \
+    classes/ \
+    sql/ \
+    upgrade/ \
+    -x "*.git*" "*.DS_Store" "*build.sh" "*Claude.md" "*.zip"
+
+echo "✓ Module packaged: ${ZIP_NAME}"
+ls -lh ${ZIP_NAME}
 ```
 
-### Interactive Menu
-
-Run `./install.sh` without arguments to open the interactive menu:
-
-### CLI Options
-
-```bash
-./install.sh --install      # Installer / Réinstaller
-./install.sh --uninstall    # Désinstaller
-./install.sh --reinstall    # Désinstaller puis Réinstaller
-./install.sh --delete       # Supprimer
-./install.sh --reset        # Supprimer puis Réinstaller
-./install.sh --restore      # Restaurer un backup
-./install.sh --cache        # Vider le cache
-./install.sh --restart      # Restart Docker Containers
-./install.sh --zip          # Build ZIP
-./install.sh --help         # Show help
-```
-
-### First Time Setup
-
+### Using the build script
 ```bash
 # Make the script executable (one time only)
-chmod +x install.sh
+chmod +x build.sh
 ```
+
+```bash
+# Generate the module ZIP
+./build.sh
+```
+
+**IMPORTANT**: If files/folders are added or removed in the module, update the list in the `build.sh` script.
 
 ## Testing and Validation
 
@@ -441,316 +484,10 @@ Include in each module:
 - PHP 7.2+ type annotations
 - Explanations for complex logic
 
-## PrestaShop 9 Compatibility (Symfony Architecture)
-
-### Overview
-
-PrestaShop 9 uses a modern Symfony-based architecture. This boilerplate supports **both** legacy (PS 1.7-8) and modern (PS 9+) approaches.
-
-### File Structure for PS9
-
-```
-src/
-├── Controller/
-│   └── Admin/
-│       └── BoilerplateItemController.php    # Symfony controller
-├── Grid/
-│   ├── Definition/
-│   │   └── Factory/
-│   │       └── BoilerplateItemGridDefinitionFactory.php
-│   └── Query/
-│       └── BoilerplateItemQueryBuilder.php
-├── Form/
-│   ├── BoilerplateItemType.php              # Symfony form type
-│   ├── BoilerplateItemDataProvider.php      # Form data provider
-│   └── BoilerplateItemDataHandler.php       # Form data handler
-└── Database/
-    └── MigrationManager.php                 # DB migration system
-config/
-├── services.yml                             # Symfony services
-└── routes.yml                               # Symfony routes
-```
-
-### Services Configuration (config/services.yml)
-
-```yaml
-services:
-  _defaults:
-    public: true
-    autowire: true
-    autoconfigure: true
-
-  # Controller
-  MyModule\Controller\Admin\MyController:
-    tags: ['controller.service_arguments']
-
-  # Grid Definition
-  MyModule\Grid\Definition\Factory\MyGridDefinitionFactory:
-    parent: 'prestashop.core.grid.definition.factory.abstract_grid_definition'
-
-  # Grid Query Builder
-  MyModule\Grid\Query\MyQueryBuilder:
-    arguments:
-      - '@doctrine.dbal.default_connection'
-      - '%database_prefix%'
-      - '@prestashop.core.grid.query.doctrine_search_criteria_applicator'
-      - '@=service("prestashop.adapter.legacy.context").getLanguage().id'
-      - '@=service("prestashop.adapter.legacy.context").getContext().shop.id'
-```
-
-### Routes Configuration (config/routes.yml)
-
-```yaml
-admin_my_items_index:
-  path: /my-items
-  methods: [GET]
-  defaults:
-    _controller: 'MyModule\Controller\Admin\MyController::indexAction'
-    _legacy_controller: AdminMyItems
-    _legacy_link: AdminMyItems
-
-admin_my_items_create:
-  path: /my-items/new
-  methods: [GET, POST]
-  defaults:
-    _controller: 'MyModule\Controller\Admin\MyController::createAction'
-    _legacy_controller: AdminMyItems
-```
-
-### Controller with AdminSecurity (PS9+)
-
-```php
-use PrestaShopBundle\Controller\Admin\PrestaShopAdminController;
-use PrestaShopBundle\Security\Attribute\AdminSecurity;
-
-class MyController extends PrestaShopAdminController
-{
-    #[AdminSecurity("is_granted('read', request.get('_legacy_controller'))")]
-    public function indexAction(
-        Request $request,
-        GridFactoryInterface $myGridFactory
-    ): Response {
-        $grid = $myGridFactory->getGrid(
-            $this->buildFiltersFromRequest($request, 'my_grid')
-        );
-
-        return $this->render('@Modules/mymodule/views/templates/admin/ps9/index.html.twig', [
-            'grid' => $this->presentGrid($grid),
-        ]);
-    }
-}
-```
-
-### Version Detection
-
-```php
-// In main module file
-public function isPs9(): bool
-{
-    return version_compare(_PS_VERSION_, '9.0.0', '>=');
-}
-
-// Usage
-if ($this->isPs9()) {
-    // Use Symfony routing
-} else {
-    // Use legacy controller
-}
-```
-
----
-
-## Database Migrations
-
-### Why Migrations?
-
-When users purchase and install your module, they have data in the database. When you release an update with schema changes, you **MUST NOT** lose their data. The migration system handles this safely.
-
-### Migration System Overview
-
-```
-sql/
-├── install.sql                 # Initial schema (fresh install)
-├── uninstall.sql               # Cleanup on uninstall
-└── migrations/
-    ├── 1.1.0.php               # Migration to v1.1.0
-    ├── 1.1.0.rollback.php      # Rollback for v1.1.0
-    ├── 1.2.0.php               # Migration to v1.2.0
-    ├── 1.2.0.rollback.php      # Rollback for v1.2.0
-    └── index.php               # Security file
-```
-
-### How Migrations Work
-
-1. **Fresh Install**: Creates tables from `installDb()`, sets version to current
-2. **Upgrade**: PrestaShop calls `upgrade($oldVersion)` → runs pending migrations
-3. **Version Tracking**: `MODULENAME_DB_VERSION` config stores current DB version
-
-### Creating a Migration File
-
-**File**: `sql/migrations/{version}.php`
-
-```php
-<?php
-/**
- * Migration 1.1.0
- *
- * Description of changes
- */
-
-return [
-    // Use PREFIX_ placeholder (replaced with actual DB prefix)
-    "ALTER TABLE `PREFIX_mymodule_item`
-     ADD COLUMN IF NOT EXISTS `slug` VARCHAR(255) DEFAULT NULL
-     AFTER `position`",
-
-    "CREATE INDEX IF NOT EXISTS `idx_slug`
-     ON `PREFIX_mymodule_item` (`slug`)",
-];
-```
-
-### Migration Best Practices
-
-```php
-// ✓ GOOD: Safe operations
-"ALTER TABLE `PREFIX_table` ADD COLUMN IF NOT EXISTS `col` VARCHAR(255)"
-"CREATE INDEX IF NOT EXISTS `idx_name` ON `PREFIX_table` (`col`)"
-"ALTER TABLE `PREFIX_table` MODIFY COLUMN `col` VARCHAR(512)"
-
-// ✗ BAD: Dangerous operations
-"DROP COLUMN `col`"              // Data loss!
-"TRUNCATE TABLE `PREFIX_table`"  // Data loss!
-"DROP TABLE `PREFIX_table`"      // Data loss!
-```
-
-### Migration Guidelines
-
-| Rule | Description |
-|------|-------------|
-| **One change per query** | Easier error handling and debugging |
-| **Use IF NOT EXISTS** | Safe re-runs, idempotent operations |
-| **PREFIX_ placeholder** | Replaced with actual `_DB_PREFIX_` |
-| **Create rollback file** | For reversible changes |
-| **Test thoroughly** | On fresh install AND upgrade scenarios |
-| **Document changes** | Comments explaining why |
-
-### Rollback Files (Optional but Recommended)
-
-**File**: `sql/migrations/{version}.rollback.php`
-
-```php
-<?php
-return [
-    "DROP INDEX IF EXISTS `idx_slug` ON `PREFIX_mymodule_item`",
-    "ALTER TABLE `PREFIX_mymodule_item` DROP COLUMN IF EXISTS `slug`",
-];
-```
-
-### Integration in Main Module
-
-```php
-use MyModule\Database\MigrationManager;
-
-class MyModule extends Module
-{
-    private $migrationManager;
-
-    protected function getMigrationManager(): MigrationManager
-    {
-        if ($this->migrationManager === null) {
-            $this->migrationManager = new MigrationManager(__DIR__);
-        }
-        return $this->migrationManager;
-    }
-
-    public function install()
-    {
-        $result = parent::install() && $this->installDb();
-
-        if ($result) {
-            // Set initial DB version
-            $this->getMigrationManager()->setCurrentVersion($this->version);
-        }
-
-        return $result;
-    }
-
-    public function upgrade($oldVersion)
-    {
-        try {
-            $this->getMigrationManager()->runMigrations($this->version);
-            return true;
-        } catch (\Exception $e) {
-            PrestaShopLogger::addLog($e->getMessage(), 3);
-            return false;
-        }
-    }
-
-    public function uninstall()
-    {
-        Configuration::deleteByName('MYMODULE_DB_VERSION');
-        return parent::uninstall();
-    }
-}
-```
-
-### Common Migration Scenarios
-
-#### Adding a new column
-
-```php
-// Migration 1.1.0.php
-return [
-    "ALTER TABLE `PREFIX_mymodule_item`
-     ADD COLUMN IF NOT EXISTS `new_field` VARCHAR(255) DEFAULT NULL",
-];
-```
-
-#### Adding multilingual field
-
-```php
-// Migration 1.2.0.php
-return [
-    "ALTER TABLE `PREFIX_mymodule_item_lang`
-     ADD COLUMN IF NOT EXISTS `meta_title` VARCHAR(255) DEFAULT NULL",
-    "ALTER TABLE `PREFIX_mymodule_item_lang`
-     ADD COLUMN IF NOT EXISTS `meta_description` VARCHAR(512) DEFAULT NULL",
-];
-```
-
-#### Adding a new table
-
-```php
-// Migration 1.3.0.php
-return [
-    "CREATE TABLE IF NOT EXISTS `PREFIX_mymodule_category` (
-        `id_category` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-        `id_parent` INT(10) UNSIGNED DEFAULT 0,
-        `active` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
-        PRIMARY KEY (`id_category`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
-];
-```
-
-#### Modifying column type (safe)
-
-```php
-// Migration 1.4.0.php
-return [
-    // Increase VARCHAR size (safe, no data loss)
-    "ALTER TABLE `PREFIX_mymodule_item`
-     MODIFY COLUMN `name` VARCHAR(512) NOT NULL",
-];
-```
-
----
-
 ## Resources
 
 - PrestaShop 8 Documentation: https://devdocs.prestashop-project.org/8/
-- PrestaShop 9 Documentation: https://devdocs.prestashop-project.org/9/
 - Module Documentation: https://devdocs.prestashop-project.org/8/modules/
-- Grid Documentation: https://devdocs.prestashop-project.org/8/development/components/grid/
 - Coding Standards: https://devdocs.prestashop-project.org/8/development/coding-standards/
 - Context7: Always use to search in official documentation
 
