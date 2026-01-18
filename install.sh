@@ -104,36 +104,76 @@ action_restore() {
         return 0
     fi
 
-    echo -e "${YELLOW}Backups disponibles:${NC}"
-    echo ""
-    for i in "${!backups[@]}"; do
-        echo -e "  ${GREEN}$((i + 1))${NC}) ${backups[$i]}"
+    # Add "Annuler" option at the end
+    backups+=("Annuler")
+
+    local selected=0
+    local key
+
+    while true; do
+        clear
+        echo ""
+        echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║${NC}  ${BOLD}Restaurer un backup${NC}"
+        echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
+        echo ""
+
+        for i in "${!backups[@]}"; do
+            if [[ $i -eq $selected ]]; then
+                echo -e "  ${GREEN}▸${NC} ${BOLD}${backups[$i]}${NC}"
+            else
+                echo -e "    ${DIM}${backups[$i]}${NC}"
+            fi
+        done
+
+        echo ""
+        echo -e "${DIM}  ↑↓ Naviguer  ⏎ Valider  Echap Annuler${NC}"
+
+        IFS= read -rsn1 key
+
+        if [[ "$key" == $'\x1b' ]]; then
+            read -rsn1 -t 0.3 k1
+            if [[ -z "$k1" ]]; then
+                info_msg "Restauration annulée"
+                return 0
+            fi
+            read -rsn1 -t 0.3 k2
+            case "${k1}${k2}" in
+                '[A') [[ $selected -gt 0 ]] && selected=$((selected - 1)) || true ;;
+                '[B') [[ $selected -lt $((${#backups[@]} - 1)) ]] && selected=$((selected + 1)) || true ;;
+            esac
+            continue
+        fi
+
+        case "$key" in
+            '')  # Entrée
+                # Check if "Annuler" selected (last option)
+                if [[ $selected -eq $((${#backups[@]} - 1)) ]]; then
+                    info_msg "Restauration annulée"
+                    return 0
+                fi
+
+                local selected_backup="${backups[$selected]}"
+                local backup_path="${BACKUP_DIR}/${selected_backup}"
+
+                clear
+                echo ""
+                info_msg "Restauration de ${selected_backup}..."
+
+                rm -rf "${TARGET_DIR:?}"
+                mkdir -p "${TARGET_DIR}"
+                cp -r "${backup_path}/." "${TARGET_DIR}/"
+
+                success_msg "Backup restauré: ${selected_backup}"
+                clear_cache
+                return 0
+                ;;
+            'q'|'Q')
+                info_msg "Restauration annulée"
+                return 0
+                ;;
+        esac
     done
-    echo -e "  ${DIM}0) Annuler${NC}"
-    echo ""
-    read -p "Choix: " choice
-
-    if [[ "$choice" == "0" ]] || [[ -z "$choice" ]]; then
-        info_msg "Restauration annulée"
-        return 0
-    fi
-
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#backups[@]} ]]; then
-        local selected_backup="${backups[$((choice - 1))]}"
-        local backup_path="${BACKUP_DIR}/${selected_backup}"
-
-        info_msg "Restauration de ${selected_backup}..."
-
-        # Delete current target and restore
-        rm -rf "${TARGET_DIR:?}"
-        mkdir -p "${TARGET_DIR}"
-        cp -r "${backup_path}/." "${TARGET_DIR}/"
-
-        success_msg "Backup restauré: ${selected_backup}"
-        clear_cache
-    else
-        error_msg "Choix invalide"
-    fi
 }
 
 # =============================================================================
