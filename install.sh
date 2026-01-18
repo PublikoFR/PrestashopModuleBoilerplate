@@ -5,7 +5,7 @@ set -e
 # Script info
 # =============================================================================
 SCRIPT_NAME="Publiko Module Installer"
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
 
 # =============================================================================
 # Configuration - À MODIFIER pour chaque nouveau module
@@ -18,6 +18,8 @@ MODULE_NAME="publikomoduleboilerplate"                            # Nom techniqu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/${MODULE_NAME}"
 TARGET_DIR="${PRESTASHOP_PATH}/modules/${MODULE_NAME}"
+BACKUP_DIR="${SCRIPT_DIR}/.backups"
+MAX_BACKUPS=5
 MODULE_VERSION=$(grep "this->version" "${SOURCE_DIR}/${MODULE_NAME}.php" 2>/dev/null | head -1 | grep -oP "'[0-9]+\.[0-9]+\.[0-9]+'" | tr -d "'" || echo "1.0.0")
 
 # Couleurs
@@ -53,9 +55,92 @@ check_prerequisites() {
 }
 
 # =============================================================================
+# Backup functions
+# =============================================================================
+backup_target() {
+    # Skip if target doesn't exist
+    if [[ ! -d "${TARGET_DIR}" ]]; then
+        info_msg "Aucune cible à sauvegarder"
+        return 0
+    fi
+
+    local timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+    local backup_path="${BACKUP_DIR}/${timestamp}"
+
+    info_msg "Sauvegarde de la cible..."
+    mkdir -p "${backup_path}"
+    cp -r "${TARGET_DIR}/." "${backup_path}/"
+    success_msg "Backup créé: ${timestamp}"
+
+    # Cleanup old backups
+    cleanup_old_backups
+}
+
+cleanup_old_backups() {
+    [[ ! -d "${BACKUP_DIR}" ]] && return 0
+
+    local backup_count=$(ls -1d "${BACKUP_DIR}"/*/ 2>/dev/null | wc -l)
+
+    if [[ $backup_count -gt $MAX_BACKUPS ]]; then
+        info_msg "Nettoyage des anciens backups..."
+        ls -1dt "${BACKUP_DIR}"/*/ | tail -n +$((MAX_BACKUPS + 1)) | xargs rm -rf
+        success_msg "Anciens backups supprimés (garde les ${MAX_BACKUPS} derniers)"
+    fi
+}
+
+list_backups() {
+    if [[ ! -d "${BACKUP_DIR}" ]] || [[ -z "$(ls -A "${BACKUP_DIR}" 2>/dev/null)" ]]; then
+        echo ""
+        return 1
+    fi
+    ls -1t "${BACKUP_DIR}" 2>/dev/null
+}
+
+action_restore() {
+    local backups=($(list_backups))
+
+    if [[ ${#backups[@]} -eq 0 ]]; then
+        info_msg "Aucun backup disponible"
+        return 0
+    fi
+
+    echo -e "${YELLOW}Backups disponibles:${NC}"
+    echo ""
+    for i in "${!backups[@]}"; do
+        echo -e "  ${GREEN}$((i + 1))${NC}) ${backups[$i]}"
+    done
+    echo -e "  ${DIM}0) Annuler${NC}"
+    echo ""
+    read -p "Choix: " choice
+
+    if [[ "$choice" == "0" ]] || [[ -z "$choice" ]]; then
+        info_msg "Restauration annulée"
+        return 0
+    fi
+
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#backups[@]} ]]; then
+        local selected_backup="${backups[$((choice - 1))]}"
+        local backup_path="${BACKUP_DIR}/${selected_backup}"
+
+        info_msg "Restauration de ${selected_backup}..."
+
+        # Delete current target and restore
+        rm -rf "${TARGET_DIR:?}"
+        mkdir -p "${TARGET_DIR}"
+        cp -r "${backup_path}/." "${TARGET_DIR}/"
+
+        success_msg "Backup restauré: ${selected_backup}"
+        clear_cache
+    else
+        error_msg "Choix invalide"
+    fi
+}
+
+# =============================================================================
 # Actions de base
 # =============================================================================
 sync_files() {
+    backup_target
     info_msg "Synchronisation des fichiers..."
     mkdir -p "${TARGET_DIR}"
     cp -r "${SOURCE_DIR}/"* "${TARGET_DIR}/"
@@ -187,6 +272,7 @@ MENU_OPTIONS=(
     "Désinstaller puis Réinstaller"
     "Supprimer"
     "Supprimer puis Réinstaller"
+    "Restaurer un backup"
     "Vider le cache"
     "Restart Docker Containers"
     "Build ZIP"
@@ -262,7 +348,7 @@ run_menu() {
                 local result=0
 
                 case $selected in
-                    8) tput cnorm 2>/dev/null || true; clear; echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
+                    9) tput cnorm 2>/dev/null || true; clear; echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
                     *)
                         tput cnorm 2>/dev/null || true
                         clear
@@ -280,9 +366,10 @@ run_menu() {
                             2) action_uninstall_reinstall ;;
                             3) action_delete ;;
                             4) action_delete_reinstall ;;
-                            5) action_clear_cache ;;
-                            6) action_restart_docker ;;
-                            7) action_build_zip ;;
+                            5) action_restore ;;
+                            6) action_clear_cache ;;
+                            7) action_restart_docker ;;
+                            8) action_build_zip ;;
                         esac
                         result=$?
                         set -e
@@ -332,6 +419,7 @@ show_help() {
     echo -e "  ${GREEN}--reinstall${NC}    Désinstaller puis Réinstaller"
     echo -e "  ${GREEN}--delete${NC}       Supprimer"
     echo -e "  ${GREEN}--reset${NC}        Supprimer puis Réinstaller"
+    echo -e "  ${GREEN}--restore${NC}      Restaurer un backup"
     echo -e "  ${GREEN}--cache${NC}        Vider le cache"
     echo -e "  ${GREEN}--restart${NC}      Restart Docker Containers"
     echo -e "  ${GREEN}--zip${NC}          Build le zip"
@@ -362,6 +450,7 @@ case "${1:-}" in
     --reinstall)   run_cli_action "Désinstaller puis Réinstaller" action_uninstall_reinstall ;;
     --delete)      run_cli_action "Supprimer" action_delete ;;
     --reset)       run_cli_action "Supprimer puis Réinstaller" action_delete_reinstall ;;
+    --restore)     run_cli_action "Restaurer un backup" action_restore ;;
     --cache)       run_cli_action "Vider le cache" action_clear_cache ;;
     --restart)     run_cli_action "Restart Docker Containers" action_restart_docker ;;
     --zip)         run_cli_action "Build ZIP" action_build_zip ;;
