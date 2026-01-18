@@ -114,7 +114,9 @@ action_restore() {
         clear
         echo ""
         echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC}  ${BOLD}Restaurer un backup${NC}"
+        echo -e "${CYAN}║${NC}  ${BOLD}${SCRIPT_NAME}${NC} v${YELLOW}${SCRIPT_VERSION}${NC}"
+        echo -e "${CYAN}║${NC}  Module: ${BOLD}${MODULE_NAME}${NC} v${YELLOW}${MODULE_VERSION}${NC}"
+        echo -e "${CYAN}║${NC}  ${DIM}Restaurer un backup${NC}"
         echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
         echo ""
 
