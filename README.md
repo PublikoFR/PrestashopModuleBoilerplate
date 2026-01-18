@@ -106,7 +106,7 @@ Files `services.yml.ps9` and `routes.yml.ps9` are copied to active config during
 
 ## Install Script
 
-The `install.sh` script provides an interactive menu for development tasks:
+The `install.sh` script (v1.1.0) provides an interactive menu with arrow key navigation for development tasks:
 
 ```bash
 chmod +x install.sh
@@ -117,13 +117,22 @@ chmod +x install.sh
 
 | Option | CLI Flag | Description |
 |--------|----------|-------------|
-| Installer / Réinstaller | `--install` | Copy files to PrestaShop, run install(), clear cache |
-| Désinstaller | `--uninstall` | Run uninstall(), clear cache |
-| Désinstaller puis Réinstaller | `--reinstall` | Uninstall + copy files + install + clear cache |
-| Supprimer puis Réinstaller | `--reset` | Uninstall + delete all files + fresh copy + install |
+| Installer / Réinstaller | `--install` | Backup + copy files to PrestaShop + install() + clear cache |
+| Désinstaller | `--uninstall` | Run uninstall() + clear cache |
+| Désinstaller puis Réinstaller | `--reinstall` | Uninstall + backup + copy files + install + clear cache |
+| Supprimer | `--delete` | Uninstall + delete all files + clear cache |
+| Supprimer puis Réinstaller | `--reset` | Uninstall + delete + backup + fresh copy + install |
+| Restaurer un backup | `--restore` | Interactive backup selection + restore + clear cache |
 | Vider le cache | `--cache` | Clear PrestaShop cache only |
 | Restart Docker | `--restart` | Run `docker compose down && up -d` |
 | Build ZIP | `--zip` | Generate distribution ZIP file |
+
+### Backup System
+
+- **Automatic backup** before each sync operation
+- Stored in `.backups/` folder (project source directory)
+- **Rotation**: keeps only the 5 most recent backups
+- **Restore**: interactive selection with arrow key navigation
 
 ### Configuration
 

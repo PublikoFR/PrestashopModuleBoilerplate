@@ -362,7 +362,7 @@ private function uninstallDB()
 
 ## Install Script (install.sh)
 
-The `install.sh` script handles module installation, synchronization, and building. It provides an interactive menu and CLI options.
+The `install.sh` script (v1.1.0) handles module installation, synchronization, and building. It provides an interactive menu with arrow key navigation and CLI options.
 
 ### Configuration for a New Module
 
@@ -383,32 +383,45 @@ Run `./install.sh` without arguments to open the interactive menu:
 
 ```
 ╔══════════════════════════════════════════════╗
-║  yourmodulename v1.0.0
+║  Publiko Module Installer v1.1.0
+║  Module: yourmodulename v1.0.0
 ╚══════════════════════════════════════════════╝
 
   ▸ Installer / Réinstaller
     Désinstaller
     Désinstaller puis Réinstaller
+    Supprimer
     Supprimer puis Réinstaller
+    Restaurer un backup
     Vider le cache
     Restart Docker Containers
     Build ZIP
     Quitter
 
-  ↑↓ Naviguer  ⏎ Valider  q Quitter
+  ↑↓ Naviguer  ⏎ Valider  Echap/q Quitter
 ```
 
 ### Menu Options
 
 | Option | Description |
 |--------|-------------|
-| **Installer / Réinstaller** | Copy files to PrestaShop, run `install()`, clear cache |
+| **Installer / Réinstaller** | Backup target, copy files to PrestaShop, run `install()`, clear cache |
 | **Désinstaller** | Run `uninstall()`, clear cache |
-| **Désinstaller puis Réinstaller** | Run `uninstall()`, copy files, run `install()`, clear cache |
-| **Supprimer puis Réinstaller** | Run `uninstall()`, delete all files, copy fresh files, run `install()`, clear cache |
+| **Désinstaller puis Réinstaller** | Run `uninstall()`, backup, copy files, run `install()`, clear cache |
+| **Supprimer** | Run `uninstall()`, delete all files, clear cache |
+| **Supprimer puis Réinstaller** | Run `uninstall()`, delete files, backup, copy fresh files, run `install()`, clear cache |
+| **Restaurer un backup** | Interactive backup selection with arrow navigation, restore and clear cache |
 | **Vider le cache** | Clear PrestaShop cache only |
 | **Restart Docker Containers** | Run `docker compose down && docker compose up -d` |
 | **Build ZIP** | Generate distribution ZIP file |
+
+### Backup System
+
+The script automatically backs up the target directory before each sync operation:
+- Backups stored in `.backups/` folder (in the project source directory)
+- Format: `YYYY-MM-DD_HH-MM-SS`
+- Automatic rotation: keeps only the 5 most recent backups
+- Restore via interactive menu with arrow key navigation
 
 ### CLI Options
 
@@ -416,7 +429,9 @@ Run `./install.sh` without arguments to open the interactive menu:
 ./install.sh --install      # Installer / Réinstaller
 ./install.sh --uninstall    # Désinstaller
 ./install.sh --reinstall    # Désinstaller puis Réinstaller
+./install.sh --delete       # Supprimer
 ./install.sh --reset        # Supprimer puis Réinstaller
+./install.sh --restore      # Restaurer un backup
 ./install.sh --cache        # Vider le cache
 ./install.sh --restart      # Restart Docker Containers
 ./install.sh --zip          # Build ZIP
