@@ -163,6 +163,30 @@ action_delete_reinstall() {
     success_msg "Terminé !"
 }
 
+action_clear_cache() {
+    echo ""
+    echo -e "${BOLD}Vider le cache${NC}"
+    echo -e "${DIM}─────────────────────────${NC}"
+    clear_cache
+    echo ""
+    success_msg "Terminé !"
+}
+
+action_restart_docker() {
+    echo ""
+    echo -e "${BOLD}Restart Docker Containers${NC}"
+    echo -e "${DIM}─────────────────────────${NC}"
+    info_msg "Arrêt des conteneurs..."
+    cd "${PRESTASHOP_PATH}"
+    docker compose down
+    info_msg "Redémarrage des conteneurs..."
+    docker compose up -d
+    cd "${SCRIPT_DIR}"
+    success_msg "Conteneurs redémarrés"
+    echo ""
+    success_msg "Terminé !"
+}
+
 action_build_zip() {
     echo ""
     echo -e "${BOLD}Build ZIP${NC}"
@@ -210,6 +234,8 @@ MENU_OPTIONS=(
     "Désinstaller"
     "Désinstaller puis Réinstaller"
     "Supprimer puis Réinstaller"
+    "Vider le cache"
+    "Restart Docker Containers"
     "Build ZIP"
     "Quitter"
 )
@@ -253,18 +279,18 @@ run_menu() {
         # Lire une touche
         IFS= read -rsn1 key
 
+        # Gérer les séquences d'échappement (flèches)
+        if [[ "$key" == $'\x1b' ]]; then
+            read -rsn1 -t 1 k1
+            read -rsn1 -t 1 k2
+            case "${k1}${k2}" in
+                '[A') [[ $selected -gt 0 ]] && selected=$((selected - 1)) || true ;;
+                '[B') [[ $selected -lt $((${#MENU_OPTIONS[@]} - 1)) ]] && selected=$((selected + 1)) || true ;;
+            esac
+            continue
+        fi
+
         case "$key" in
-            $'\x1b')  # Séquence d'échappement (flèches)
-                read -rsn2 -t 0.1 key
-                case "$key" in
-                    '[A')  # Flèche haut
-                        ((selected > 0)) && ((selected--))
-                        ;;
-                    '[B')  # Flèche bas
-                        ((selected < ${#MENU_OPTIONS[@]} - 1)) && ((selected++))
-                        ;;
-                esac
-                ;;
             '')  # Entrée
                 tput cnorm 2>/dev/null || true
                 clear
@@ -274,13 +300,16 @@ run_menu() {
                     1) action_uninstall ;;
                     2) action_uninstall_reinstall ;;
                     3) action_delete_reinstall ;;
-                    4) action_build_zip ;;
-                    5) echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
+                    4) action_clear_cache ;;
+                    5) action_restart_docker ;;
+                    6) action_build_zip ;;
+                    7) echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
                 esac
 
                 echo ""
-                echo -e "${DIM}Appuyez sur une touche pour continuer...${NC}"
-                read -rsn1
+                echo -e "${DIM}Appuyez sur Entrée pour revenir au menu (q pour quitter)...${NC}"
+                read -rsn1 key
+                [[ "$key" == "q" || "$key" == "Q" ]] && { tput cnorm 2>/dev/null || true; echo -e "${DIM}Au revoir !${NC}"; exit 0; }
                 tput civis 2>/dev/null || true
                 ;;
             'q'|'Q')  # Quitter
@@ -290,10 +319,14 @@ run_menu() {
                 exit 0
                 ;;
             'k')  # vim: haut
-                ((selected > 0)) && ((selected--))
+                [[ $selected -gt 0 ]] && selected=$((selected - 1)) || true
                 ;;
             'j')  # vim: bas
-                ((selected < ${#MENU_OPTIONS[@]} - 1)) && ((selected++))
+                [[ $selected -lt $((${#MENU_OPTIONS[@]} - 1)) ]] && selected=$((selected + 1)) || true
+                ;;
+            [1-8])  # Sélection directe par numéro
+                local num=$((key - 1))
+                [[ $num -lt ${#MENU_OPTIONS[@]} ]] && selected=$num || true
                 ;;
         esac
     done
@@ -309,6 +342,8 @@ show_help() {
     echo -e "  ${GREEN}--uninstall${NC}    Désinstaller"
     echo -e "  ${GREEN}--reinstall${NC}    Désinstaller puis Réinstaller"
     echo -e "  ${GREEN}--reset${NC}        Supprimer puis Réinstaller"
+    echo -e "  ${GREEN}--cache${NC}        Vider le cache"
+    echo -e "  ${GREEN}--restart${NC}      Restart Docker Containers"
     echo -e "  ${GREEN}--zip${NC}          Build le zip"
     echo -e "  ${GREEN}--help${NC}         Affiche cette aide"
     echo ""
@@ -325,6 +360,8 @@ case "${1:-}" in
     --uninstall)   action_uninstall ;;
     --reinstall)   action_uninstall_reinstall ;;
     --reset)       action_delete_reinstall ;;
+    --cache)       action_clear_cache ;;
+    --restart)     action_restart_docker ;;
     --zip)         action_build_zip ;;
     --help|-h)     show_help ;;
     "")            run_menu ;;
