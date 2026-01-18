@@ -66,20 +66,18 @@ delete_files() {
     fi
 }
 
+PS_EXEC="docker exec -e SERVER_PORT=80 -e HTTP_HOST=localhost ${DOCKER_CONTAINER}"
+PS_CONSOLE="php -d memory_limit=1G /var/www/html/bin/console"
+
 clear_cache() {
     info_msg "Vidage du cache..."
-    if [[ -x "${PRESTASHOP_PATH}/rmcache.sh" ]]; then
-        "${PRESTASHOP_PATH}/rmcache.sh" >/dev/null 2>&1
-        success_msg "Cache vidé"
-    else
-        docker exec ${DOCKER_CONTAINER} rm -rf /var/www/html/var/cache/* 2>/dev/null || true
-        success_msg "Cache vidé (via Docker)"
-    fi
+    docker exec ${DOCKER_CONTAINER} sh -c "rm -rf /var/www/html/var/cache/* && mkdir -p /var/www/html/var/cache/dev && chown -R www-data:www-data /var/www/html/var/cache && chmod -R 775 /var/www/html/var/cache" 2>/dev/null || true
+    success_msg "Cache vidé"
 }
 
 do_install() {
     info_msg "Installation du module..."
-    if docker exec ${DOCKER_CONTAINER} php /var/www/html/bin/console prestashop:module install ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful"; then
+    if ${PS_EXEC} ${PS_CONSOLE} prestashop:module install ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful"; then
         success_msg "Module installé"
     else
         error_msg "Installation échouée"
@@ -88,7 +86,7 @@ do_install() {
 
 do_uninstall() {
     info_msg "Désinstallation du module..."
-    docker exec ${DOCKER_CONTAINER} php /var/www/html/bin/console prestashop:module uninstall ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful" || true
+    ${PS_EXEC} ${PS_CONSOLE} prestashop:module uninstall ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful" || true
     success_msg "Module désinstallé"
 }
 
