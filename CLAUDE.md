@@ -58,8 +58,6 @@ mymodule/
 └── README.md
 
 ```
-## Logo
-- When you create a Publiko Prestashop module, import this logo : https://www.publiko.fr/wp-content/uploads/2024/09/favicon-150x150.png
 
 ## Agents
 - Always check the availables agens to and hire them as much as possible to do parallels tasks
@@ -362,7 +360,8 @@ private function uninstallDB()
 
 ## Install Script (install.sh)
 
-The `install.sh` script (v1.1.0) handles module installation, synchronization, and building. It provides an interactive menu with arrow key navigation and CLI options.
+- The `install.sh` script handles module installation, synchronization, and building. It provides an interactive menu with arrow key navigation and CLI options.
+- When you init a project from this boilerplate, simply rename the variables in .env.install
 
 ### Configuration for a New Module
 
