@@ -77,40 +77,18 @@ clear_cache() {
     fi
 }
 
-exec_module_action() {
-    local action=$1
-    docker exec ${DOCKER_CONTAINER} php -r "
-        require_once '/var/www/html/config/config.inc.php';
-        require_once '/var/www/html/init.php';
-        \$module = Module::getInstanceByName('${MODULE_NAME}');
-        if (!\$module) { echo 'Module non trouvé'; exit(1); }
-        ${action}
-    " 2>/dev/null
-}
-
 do_install() {
     info_msg "Installation du module..."
-    exec_module_action "
-        if (\$module->install()) {
-            echo 'OK';
-        } else {
-            echo 'FAIL: ' . implode(', ', \$module->getErrors());
-            exit(1);
-        }
-    " || error_msg "Installation échouée"
-    success_msg "Module installé"
+    if docker exec ${DOCKER_CONTAINER} php /var/www/html/bin/console prestashop:module install ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful"; then
+        success_msg "Module installé"
+    else
+        error_msg "Installation échouée"
+    fi
 }
 
 do_uninstall() {
     info_msg "Désinstallation du module..."
-    exec_module_action "
-        if (\$module->uninstall()) {
-            echo 'OK';
-        } else {
-            echo 'FAIL';
-            exit(1);
-        }
-    " 2>/dev/null || info_msg "Module déjà désinstallé ou non trouvé"
+    docker exec ${DOCKER_CONTAINER} php /var/www/html/bin/console prestashop:module uninstall ${MODULE_NAME} 2>&1 | grep -q "réussi\|successful" || true
     success_msg "Module désinstallé"
 }
 
