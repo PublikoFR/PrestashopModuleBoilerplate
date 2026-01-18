@@ -79,11 +79,13 @@ backup_target() {
 cleanup_old_backups() {
     [[ ! -d "${BACKUP_DIR}" ]] && return 0
 
-    local backup_count=$(ls -1d "${BACKUP_DIR}"/*/ 2>/dev/null | wc -l)
+    local backup_count=$(find "${BACKUP_DIR}" -maxdepth 1 -mindepth 1 -type d | wc -l)
 
     if [[ $backup_count -gt $MAX_BACKUPS ]]; then
         info_msg "Nettoyage des anciens backups..."
-        ls -1dt "${BACKUP_DIR}"/*/ | tail -n +$((MAX_BACKUPS + 1)) | xargs rm -rf
+        ls -1dt "${BACKUP_DIR}"/*/ | tail -n +$((MAX_BACKUPS + 1)) | while read -r dir; do
+            rm -rf "$dir"
+        done
         success_msg "Anciens backups supprimés (garde les ${MAX_BACKUPS} derniers)"
     fi
 }
