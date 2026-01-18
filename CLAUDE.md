@@ -1,90 +1,91 @@
-# Guide Développement PrestaShop 8
+# PrestaShop 8 Development Guide
 
-## Contexte
+## Context
 
-Module PrestaShop 8 professionnel, prêt pour commercialisation. Compatibilité étendue PS 1.7 à PS 9.
+Professional PrestaShop 8 module, ready for commercialization. Extended compatibility PS 1.7 to PS 9.
 
 ## Agents
 
-Toujours vérifier les agents disponibles et les utiliser en parallèle autant que possible.
+Always check available agents and use them in parallel as much as possible.
 
 ## Documentation
 
-**Toujours** utiliser Context7 avant d'implémenter une fonctionnalité :
+**Always** use Context7 before implementing a feature:
 ```bash
-context7 search "votre requête"
+context7 search "your query"
 ```
 
-## Structure Module
+## Module Structure
 
 ```
 mymodule/
-├── mymodule.php          # Fichier principal
-├── config.xml            # Configuration (optionnel)
-├── index.php             # Protection répertoire
+├── mymodule.php          # Main file
+├── config.xml            # Configuration (optional)
+├── index.php             # Directory protection
 ├── logo.png              # Logo 57x57px
-├── translations/         # Traductions (fr.php, en.php)
+├── translations/         # Translations (fr.php, en.php)
 ├── views/
-│   ├── templates/admin/  # Templates back-office
-│   ├── templates/hook/   # Templates front-office
+│   ├── templates/admin/  # Back-office templates
+│   ├── templates/hook/   # Front-office templates
 │   ├── css/, js/, img/
 ├── controllers/admin/, front/
 ├── classes/
 ├── sql/
 │   ├── install.php
 │   ├── uninstall.php
-│   └── migrations/       # Migrations BDD
+│   └── migrations/       # DB migrations
 └── upgrade/
 ```
 
-## Conventions de Code
+## Coding Conventions
 
-### Nommage
-- **Classe principale** : CamelCase (`MyModule`)
-- **Nom technique** : minuscules sans espaces (`mymodule`)
-- **Classes** : PascalCase | **Méthodes** : camelCase
-- **Constantes** : UPPER_SNAKE_CASE | **Variables** : snake_case
+### Naming
+- **Main class**: CamelCase (`MyModule`)
+- **Technical name**: lowercase no spaces (`mymodule`)
+- **Classes**: PascalCase | **Methods**: camelCase
+- **Constants**: UPPER_SNAKE_CASE | **Variables**: snake_case
 
 ### Standards
-- PSR-2, indentation 4 espaces
-- Typage PHP 7.2+ obligatoire
-- Namespaces pour PS 8+
+- **All code and comments in English**
+- PSR-2, 4 spaces indentation
+- PHP 7.2+ typing required
+- Namespaces for PS 8+
 
-### Sécurité
-- Échapper sorties : `Tools::safeOutput()`, `{$var|escape:'html':'UTF-8'}`
-- Valider entrées : `Validate::isInt()`, `Validate::isEmail()`
-- Tokens formulaires : `Tools::getAdminTokenLite()`
-- SQL : `Db::getInstance()->escape()` ou requêtes préparées
-- `index.php` dans chaque dossier
+### Security
+- Escape outputs: `Tools::safeOutput()`, `{$var|escape:'html':'UTF-8'}`
+- Validate inputs: `Validate::isInt()`, `Validate::isEmail()`
+- Form tokens: `Tools::getAdminTokenLite()`
+- SQL: `Db::getInstance()->escape()` or prepared queries
+- `index.php` in every folder
 
-## Base de Données
+## Database
 
-### Règles Critiques
+### Critical Rules
 
-**INTERDIT** : Modifier les tables natives PrestaShop (`ALTER TABLE` sur table existante)
+**FORBIDDEN**: Modify native PrestaShop tables (`ALTER TABLE` on existing table)
 
-**OBLIGATOIRE** : Créer ses propres tables avec préfixe `pko_` (Publiko)
+**REQUIRED**: Create own tables with `pko_` prefix (Publiko)
 
-### Nommage Tables
+### Table Naming
 
-Format : `{_DB_PREFIX_}pko_{nomtable}`
+Format: `{_DB_PREFIX_}pko_{tablename}`
 
 ```
 ✓ ps_pko_mymodule_data
 ✓ ps_pko_mymodule_data_lang
-✗ ps_product (table native)
-✗ ps_mymodule_data (manque pko_)
+✗ ps_product (native table)
+✗ ps_mymodule_data (missing pko_)
 ```
 
-### Optimisation
-- Minimum de tables possible
-- Regrouper données liées
-- Tables `_lang` uniquement si multilingue nécessaire
-- Clés étrangères vers tables PS (`id_product`, `id_customer`)
+### Optimization
+- Minimum tables possible
+- Group related data
+- `_lang` tables only if multilingual needed
+- Foreign keys to PS tables (`id_product`, `id_customer`)
 
 ### Migrations
 
-**OBLIGATOIRE** après version 1.0.0 pour toute modification BDD :
+**REQUIRED** after version 1.0.0 for any DB modification:
 
 ```php
 // sql/migrations/1.1.0.php
@@ -93,7 +94,7 @@ return [
 ];
 ```
 
-### Installation BDD
+### DB Installation
 
 ```php
 const PKO_PREFIX = 'pko_';
@@ -111,16 +112,16 @@ private function installDB()
 }
 ```
 
-## Multilingue
+## Multilingual
 
 ```php
 // PHP
-$this->l('Texte à traduire');
+$this->l('Text to translate');
 
 // Smarty
-{l s='Texte à traduire' mod='mymodule'}
+{l s='Text to translate' mod='mymodule'}
 
-// Config multilingue
+// Multilingual config
 Configuration::updateValue('MY_CONFIG', $values, true);
 Configuration::get('MY_CONFIG', $id_lang);
 ```
@@ -143,9 +144,9 @@ public function hookDisplayHeader($params)
 
 ## Overrides
 
-### Éviter au Maximum
+### Avoid as Much as Possible
 
-Problèmes : conflits modules, maintenance difficile, rejet Marketplace.
+Issues: module conflicts, difficult maintenance, Marketplace rejection.
 
 ### Alternatives
 ```php
@@ -155,47 +156,47 @@ class Product extends ProductCore { }
 // ✓ Hooks
 public function hookActionProductSave($params) { }
 
-// ✓ Classes propres
+// ✓ Own classes
 class MyModuleProductHelper { }
 ```
 
-### Si Indispensable
-- Toujours appeler `parent::`
-- Documenter : pourquoi, alternatives testées, version PS, risques
+### If Unavoidable
+- Always call `parent::`
+- Document: why, tested alternatives, PS version, risks
 
 ## Install Script (install.sh)
 
-Script unifié pour modules ET thèmes. Config dans `.env.install` :
+Unified script for modules AND themes. Config in `.env.install`:
 
 ```bash
-TYPE="module"  # ou "theme"
+TYPE="module"  # or "theme"
 PRESTASHOP_PATH="/path/to/prestashop"
 DOCKER_CONTAINER="container_name"
-MODULE_NAME="mymodule"  # ou NAME pour thèmes
+MODULE_NAME="mymodule"  # or NAME for themes
 ```
 
-### Commandes
+### Commands
 ```bash
-./install.sh              # Menu interactif
-./install.sh --install    # Installer
-./install.sh --update-script  # Mise à jour script
-./install.sh --help       # Aide complète
+./install.sh              # Interactive menu
+./install.sh --install    # Install
+./install.sh --update-script  # Update script
+./install.sh --help       # Full help
 ```
 
-## Checklist Finale
+## Final Checklist
 
-- [ ] Version incrémentée
-- [ ] Traductions complètes
-- [ ] Tests PS 8 (+ PS 1.7/9 si possible)
-- [ ] Code sécurisé, pas de var_dump
-- [ ] Logo 57x57px présent
-- [ ] index.php partout
-- [ ] Aucune table native modifiée
-- [ ] Pas d'overrides (ou justifiés)
-- [ ] ZIP testé
+- [ ] Version incremented
+- [ ] Translations complete
+- [ ] Tests on PS 8 (+ PS 1.7/9 if possible)
+- [ ] Code secured, no var_dump
+- [ ] Logo 57x57px present
+- [ ] index.php everywhere
+- [ ] No native table modified
+- [ ] No overrides (or justified)
+- [ ] ZIP tested
 
-## Ressources
+## Resources
 
-- [Documentation PS 8](https://devdocs.prestashop-project.org/8/)
-- [Documentation Modules](https://devdocs.prestashop-project.org/8/modules/)
-- [Validateur PrestaShop](https://validator.prestashop.com/)
+- [PS 8 Documentation](https://devdocs.prestashop-project.org/8/)
+- [Module Documentation](https://devdocs.prestashop-project.org/8/modules/)
+- [PrestaShop Validator](https://validator.prestashop.com/)
