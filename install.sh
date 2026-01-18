@@ -137,7 +137,7 @@ action_restore() {
             read -rsn1 -t 0.3 k1
             if [[ -z "$k1" ]]; then
                 info_msg "Restauration annulée"
-                return 0
+                return 2
             fi
             read -rsn1 -t 0.3 k2
             case "${k1}${k2}" in
@@ -152,7 +152,7 @@ action_restore() {
                 # Check if "Annuler" selected (last option)
                 if [[ $selected -eq $((${#backups[@]} - 1)) ]]; then
                     info_msg "Restauration annulée"
-                    return 0
+                    return 2
                 fi
 
                 local selected_backup="${backups[$selected]}"
@@ -172,7 +172,7 @@ action_restore() {
                 ;;
             'q'|'Q')
                 info_msg "Restauration annulée"
-                return 0
+                return 2
                 ;;
         esac
     done
@@ -416,15 +416,18 @@ run_menu() {
                         result=$?
                         set -e
 
-                        if [[ $result -ne 0 ]]; then
+                        if [[ $result -eq 0 ]]; then
+                            # Succès
+                            last_status="${action_name} - Terminé !"
+                        elif [[ $result -eq 2 ]]; then
+                            # Annulé
+                            last_status="${action_name} - Annulé"
+                        else
                             # Erreur : attendre une touche
                             echo ""
                             echo -e "${DIM}Appuyez sur une touche pour continuer...${NC}"
                             read -rsn1
                             last_status=""
-                        else
-                            # Succès : message pour le prochain affichage
-                            last_status="${action_name} - Terminé !"
                         fi
                         tput civis 2>/dev/null || true
                         ;;
