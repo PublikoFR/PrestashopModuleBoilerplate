@@ -5,17 +5,31 @@ set -e
 # Script info
 # =============================================================================
 SCRIPT_NAME="Publiko Module Installer"
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="1.2.0"
+
+# URL du repo pour auto-update (raw GitHub)
+UPDATE_REPO_URL="https://raw.githubusercontent.com/publiko/prestashop-module-installer/main"
 
 # =============================================================================
-# Configuration - À MODIFIER pour chaque nouveau module
+# Configuration - Chargement depuis .env.install
 # =============================================================================
-PRESTASHOP_PATH="/home/riderfx3/webdev/projects/MDE Prestashop"  # Chemin vers PrestaShop local
-DOCKER_CONTAINER="mde_prestashop"                                 # Nom du conteneur Docker
-MODULE_NAME="publikomoduleboilerplate"                            # Nom technique du module (sans espaces)
-# =============================================================================
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/.env.install"
+
+if [[ -f "${ENV_FILE}" ]]; then
+    source "${ENV_FILE}"
+else
+    echo -e "\033[0;31m✗ Erreur:\033[0m Fichier .env.install non trouvé"
+    echo -e "  Copiez .env.install.example vers .env.install et configurez-le"
+    exit 1
+fi
+
+# Validation des variables requises
+[[ -z "${PRESTASHOP_PATH:-}" ]] && echo -e "\033[0;31m✗ Erreur:\033[0m PRESTASHOP_PATH non défini dans .env.install" && exit 1
+[[ -z "${DOCKER_CONTAINER:-}" ]] && echo -e "\033[0;31m✗ Erreur:\033[0m DOCKER_CONTAINER non défini dans .env.install" && exit 1
+[[ -z "${MODULE_NAME:-}" ]] && echo -e "\033[0;31m✗ Erreur:\033[0m MODULE_NAME non défini dans .env.install" && exit 1
+# =============================================================================
+
 SOURCE_DIR="${SCRIPT_DIR}/${MODULE_NAME}"
 TARGET_DIR="${PRESTASHOP_PATH}/modules/${MODULE_NAME}"
 BACKUP_DIR="${SCRIPT_DIR}/.backups"
@@ -52,6 +66,91 @@ check_prerequisites() {
     [[ ! -d "${SOURCE_DIR}" ]] && error_msg "Dossier source ${MODULE_NAME}/ non trouvé"
     [[ ! -d "${PRESTASHOP_PATH}" ]] && error_msg "PrestaShop non trouvé: ${PRESTASHOP_PATH}"
     docker ps --format '{{.Names}}' | grep -q "^${DOCKER_CONTAINER}$" || error_msg "Conteneur Docker '${DOCKER_CONTAINER}' non actif"
+}
+
+# =============================================================================
+# Auto-update
+# =============================================================================
+check_for_update() {
+    local remote_version
+    local update_available=false
+
+    info_msg "Vérification des mises à jour..."
+
+    # Récupérer la version distante
+    remote_version=$(curl -s --connect-timeout 5 "${UPDATE_REPO_URL}/VERSION" 2>/dev/null || echo "")
+
+    if [[ -z "$remote_version" ]]; then
+        error_msg "Impossible de vérifier les mises à jour (pas de connexion ?)"
+        return 1
+    fi
+
+    # Nettoyer la version (supprimer espaces/retours ligne)
+    remote_version=$(echo "$remote_version" | tr -d '[:space:]')
+
+    if [[ "$remote_version" != "$SCRIPT_VERSION" ]]; then
+        # Comparer les versions (semver simple)
+        if [[ "$(printf '%s\n' "$SCRIPT_VERSION" "$remote_version" | sort -V | tail -n1)" == "$remote_version" ]]; then
+            update_available=true
+        fi
+    fi
+
+    if [[ "$update_available" == true ]]; then
+        echo ""
+        echo -e "${YELLOW}╔══════════════════════════════════════════════╗${NC}"
+        echo -e "${YELLOW}║${NC}  ${BOLD}Nouvelle version disponible !${NC}"
+        echo -e "${YELLOW}║${NC}  Actuelle: ${RED}${SCRIPT_VERSION}${NC} → Nouvelle: ${GREEN}${remote_version}${NC}"
+        echo -e "${YELLOW}╚══════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "  Mettre à jour maintenant ? [o/N] "
+        read -rsn1 answer
+        echo ""
+
+        if [[ "$answer" == "o" || "$answer" == "O" || "$answer" == "y" || "$answer" == "Y" ]]; then
+            do_update
+        else
+            info_msg "Mise à jour ignorée"
+        fi
+    else
+        success_msg "Vous utilisez la dernière version (${SCRIPT_VERSION})"
+    fi
+}
+
+do_update() {
+    local temp_script
+    temp_script=$(mktemp)
+
+    info_msg "Téléchargement de la nouvelle version..."
+
+    if curl -s --connect-timeout 10 "${UPDATE_REPO_URL}/install.sh" -o "$temp_script" 2>/dev/null; then
+        # Vérifier que le fichier téléchargé est valide (commence par #!/bin/bash)
+        if head -1 "$temp_script" | grep -q "^#!/bin/bash"; then
+            # Sauvegarder l'ancienne version
+            cp "${SCRIPT_DIR}/install.sh" "${SCRIPT_DIR}/install.sh.bak"
+
+            # Remplacer le script
+            mv "$temp_script" "${SCRIPT_DIR}/install.sh"
+            chmod +x "${SCRIPT_DIR}/install.sh"
+
+            success_msg "Mise à jour effectuée !"
+            echo -e "${DIM}  Ancien script sauvegardé: install.sh.bak${NC}"
+            echo ""
+            echo -e "${YELLOW}Relancez le script pour utiliser la nouvelle version.${NC}"
+            exit 0
+        else
+            rm -f "$temp_script"
+            error_msg "Fichier téléchargé invalide"
+            return 1
+        fi
+    else
+        rm -f "$temp_script"
+        error_msg "Échec du téléchargement"
+        return 1
+    fi
+}
+
+action_update_script() {
+    check_for_update
 }
 
 # =============================================================================
@@ -320,6 +419,7 @@ MENU_OPTIONS=(
     "Vider le cache"
     "Restart Docker Containers"
     "Build ZIP"
+    "Mise à jour du script"
     "Quitter"
 )
 
@@ -392,7 +492,7 @@ run_menu() {
                 local result=0
 
                 case $selected in
-                    9) tput cnorm 2>/dev/null || true; clear; echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
+                    10) tput cnorm 2>/dev/null || true; clear; echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
                     *)
                         tput cnorm 2>/dev/null || true
                         clear
@@ -414,6 +514,7 @@ run_menu() {
                             6) action_clear_cache ;;
                             7) action_restart_docker ;;
                             8) action_build_zip ;;
+                            9) action_update_script ;;
                         esac
                         result=$?
                         set -e
@@ -470,6 +571,7 @@ show_help() {
     echo -e "  ${GREEN}--cache${NC}        Vider le cache"
     echo -e "  ${GREEN}--restart${NC}      Restart Docker Containers"
     echo -e "  ${GREEN}--zip${NC}          Build le zip"
+    echo -e "  ${GREEN}--update-script${NC}  Mise à jour du script"
     echo -e "  ${GREEN}--help${NC}         Affiche cette aide"
     echo ""
 }
@@ -501,6 +603,7 @@ case "${1:-}" in
     --cache)       run_cli_action "Vider le cache" action_clear_cache ;;
     --restart)     run_cli_action "Restart Docker Containers" action_restart_docker ;;
     --zip)         run_cli_action "Build ZIP" action_build_zip ;;
+    --update-script) run_cli_action "Mise à jour du script" action_update_script ;;
     --help|-h)     show_help ;;
     "")            run_menu ;;
     *)             error_msg "Option inconnue: $1. Utilisez --help pour l'aide." ;;

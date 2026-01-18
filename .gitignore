@@ -3,6 +3,10 @@
 build/
 .backups/
 
+# Install script config (local)
+.env.install
+install.sh.bak
+
 # IDE
 .idea/
 .vscode/
