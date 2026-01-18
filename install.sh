@@ -2,6 +2,12 @@
 set -e
 
 # =============================================================================
+# Script info
+# =============================================================================
+SCRIPT_NAME="Publiko Module Installer"
+SCRIPT_VERSION="1.0.0"
+
+# =============================================================================
 # Configuration - À MODIFIER pour chaque nouveau module
 # =============================================================================
 PRESTASHOP_PATH="/home/riderfx3/webdev/projects/MDE Prestashop"  # Chemin vers PrestaShop local
@@ -12,7 +18,7 @@ MODULE_NAME="publikomoduleboilerplate"                            # Nom techniqu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/${MODULE_NAME}"
 TARGET_DIR="${PRESTASHOP_PATH}/modules/${MODULE_NAME}"
-VERSION=$(grep "this->version" "${SOURCE_DIR}/${MODULE_NAME}.php" 2>/dev/null | head -1 | grep -oP "'[0-9]+\.[0-9]+\.[0-9]+'" | tr -d "'" || echo "1.0.0")
+MODULE_VERSION=$(grep "this->version" "${SOURCE_DIR}/${MODULE_NAME}.php" 2>/dev/null | head -1 | grep -oP "'[0-9]+\.[0-9]+\.[0-9]+'" | tr -d "'" || echo "1.0.0")
 
 # Couleurs
 RED='\033[0;31m'
@@ -33,7 +39,7 @@ success_msg() {
 
 error_msg() {
     echo -e "${RED}✗ Erreur:${NC} $1"
-    exit 1
+    return 1
 }
 
 info_msg() {
@@ -94,64 +100,42 @@ do_uninstall() {
 # Actions composées
 # =============================================================================
 action_install_reinstall() {
-    echo ""
-    echo -e "${BOLD}Installer / Réinstaller${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     sync_files
     do_install
     clear_cache
-    echo ""
-    success_msg "Terminé !"
 }
 
 action_uninstall() {
-    echo ""
-    echo -e "${BOLD}Désinstaller${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     do_uninstall
     clear_cache
-    echo ""
-    success_msg "Terminé !"
 }
 
 action_uninstall_reinstall() {
-    echo ""
-    echo -e "${BOLD}Désinstaller puis Réinstaller${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     do_uninstall
     sync_files
     do_install
     clear_cache
-    echo ""
-    success_msg "Terminé !"
+}
+
+action_delete() {
+    do_uninstall
+    delete_files
+    clear_cache
 }
 
 action_delete_reinstall() {
-    echo ""
-    echo -e "${BOLD}Supprimer puis Réinstaller${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     do_uninstall
     delete_files
     sync_files
     do_install
     clear_cache
-    echo ""
-    success_msg "Terminé !"
 }
 
 action_clear_cache() {
-    echo ""
-    echo -e "${BOLD}Vider le cache${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     clear_cache
-    echo ""
-    success_msg "Terminé !"
 }
 
 action_restart_docker() {
-    echo ""
-    echo -e "${BOLD}Restart Docker Containers${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
     info_msg "Arrêt des conteneurs..."
     cd "${PRESTASHOP_PATH}"
     docker compose down
@@ -159,16 +143,10 @@ action_restart_docker() {
     docker compose up -d
     cd "${SCRIPT_DIR}"
     success_msg "Conteneurs redémarrés"
-    echo ""
-    success_msg "Terminé !"
 }
 
 action_build_zip() {
-    echo ""
-    echo -e "${BOLD}Build ZIP${NC}"
-    echo -e "${DIM}─────────────────────────${NC}"
-
-    local zip_name="${MODULE_NAME}_v${VERSION}.zip"
+    local zip_name="${MODULE_NAME}_v${MODULE_VERSION}.zip"
     local temp_dir=$(mktemp -d)
 
     rm -f "${SCRIPT_DIR}/${zip_name}"
@@ -197,9 +175,7 @@ action_build_zip() {
     rm -rf "${temp_dir}"
 
     local zip_size=$(du -h "${SCRIPT_DIR}/${zip_name}" | cut -f1)
-    echo ""
-    success_msg "Terminé !"
-    echo -e "  → ${CYAN}${zip_name}${NC} (${zip_size})"
+    success_msg "Archive créée: ${zip_name} (${zip_size})"
 }
 
 # =============================================================================
@@ -209,6 +185,7 @@ MENU_OPTIONS=(
     "Installer / Réinstaller"
     "Désinstaller"
     "Désinstaller puis Réinstaller"
+    "Supprimer"
     "Supprimer puis Réinstaller"
     "Vider le cache"
     "Restart Docker Containers"
@@ -218,10 +195,15 @@ MENU_OPTIONS=(
 
 print_menu() {
     local selected=$1
+    local status_msg=$2
 
     echo ""
     echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║${NC}  ${BOLD}${MODULE_NAME}${NC} v${YELLOW}${VERSION}${NC}"
+    echo -e "${CYAN}║${NC}  ${BOLD}${SCRIPT_NAME}${NC} v${YELLOW}${SCRIPT_VERSION}${NC}"
+    echo -e "${CYAN}║${NC}  Module: ${BOLD}${MODULE_NAME}${NC} v${YELLOW}${MODULE_VERSION}${NC}"
+    if [[ -n "$status_msg" ]]; then
+        echo -e "${CYAN}║${NC}  ${GREEN}✓${NC} ${status_msg}"
+    fi
     echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
     echo ""
 
@@ -234,12 +216,13 @@ print_menu() {
     done
 
     echo ""
-    echo -e "${DIM}  ↑↓ Naviguer  ⏎ Valider  q Quitter${NC}"
+    echo -e "${DIM}  ↑↓ Naviguer  ⏎ Valider  Echap/q Quitter${NC}"
 }
 
 run_menu() {
     local selected=0
     local key
+    local last_status=""
 
     # Cacher le curseur
     tput civis 2>/dev/null || true
@@ -250,15 +233,22 @@ run_menu() {
     while true; do
         # Effacer l'écran et afficher le menu
         clear
-        print_menu $selected
+        print_menu $selected "$last_status"
 
         # Lire une touche
         IFS= read -rsn1 key
 
-        # Gérer les séquences d'échappement (flèches)
+        # Gérer les séquences d'échappement (flèches ou Echap seul)
         if [[ "$key" == $'\x1b' ]]; then
-            read -rsn1 -t 1 k1
-            read -rsn1 -t 1 k2
+            read -rsn1 -t 0.3 k1
+            if [[ -z "$k1" ]]; then
+                # Echap seul : quitter
+                tput cnorm 2>/dev/null || true
+                clear
+                echo -e "${DIM}Au revoir !${NC}"
+                exit 0
+            fi
+            read -rsn1 -t 0.3 k2
             case "${k1}${k2}" in
                 '[A') [[ $selected -gt 0 ]] && selected=$((selected - 1)) || true ;;
                 '[B') [[ $selected -lt $((${#MENU_OPTIONS[@]} - 1)) ]] && selected=$((selected + 1)) || true ;;
@@ -268,25 +258,48 @@ run_menu() {
 
         case "$key" in
             '')  # Entrée
-                tput cnorm 2>/dev/null || true
-                clear
+                local action_name="${MENU_OPTIONS[$selected]}"
+                local result=0
 
                 case $selected in
-                    0) action_install_reinstall ;;
-                    1) action_uninstall ;;
-                    2) action_uninstall_reinstall ;;
-                    3) action_delete_reinstall ;;
-                    4) action_clear_cache ;;
-                    5) action_restart_docker ;;
-                    6) action_build_zip ;;
-                    7) echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
-                esac
+                    8) tput cnorm 2>/dev/null || true; clear; echo -e "${DIM}Au revoir !${NC}"; exit 0 ;;
+                    *)
+                        tput cnorm 2>/dev/null || true
+                        clear
+                        echo ""
+                        echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
+                        echo -e "${CYAN}║${NC}  ${BOLD}${action_name}${NC}"
+                        echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
+                        echo ""
 
-                echo ""
-                echo -e "${DIM}Appuyez sur Entrée pour revenir au menu (q pour quitter)...${NC}"
-                read -rsn1 key
-                [[ "$key" == "q" || "$key" == "Q" ]] && { tput cnorm 2>/dev/null || true; echo -e "${DIM}Au revoir !${NC}"; exit 0; }
-                tput civis 2>/dev/null || true
+                        # Exécuter l'action et capturer le résultat
+                        set +e
+                        case $selected in
+                            0) action_install_reinstall ;;
+                            1) action_uninstall ;;
+                            2) action_uninstall_reinstall ;;
+                            3) action_delete ;;
+                            4) action_delete_reinstall ;;
+                            5) action_clear_cache ;;
+                            6) action_restart_docker ;;
+                            7) action_build_zip ;;
+                        esac
+                        result=$?
+                        set -e
+
+                        if [[ $result -ne 0 ]]; then
+                            # Erreur : attendre une touche
+                            echo ""
+                            echo -e "${DIM}Appuyez sur une touche pour continuer...${NC}"
+                            read -rsn1
+                            last_status=""
+                        else
+                            # Succès : message pour le prochain affichage
+                            last_status="${action_name} - Terminé !"
+                        fi
+                        tput civis 2>/dev/null || true
+                        ;;
+                esac
                 ;;
             'q'|'Q')  # Quitter
                 tput cnorm 2>/dev/null || true
@@ -300,7 +313,7 @@ run_menu() {
             'j')  # vim: bas
                 [[ $selected -lt $((${#MENU_OPTIONS[@]} - 1)) ]] && selected=$((selected + 1)) || true
                 ;;
-            [1-8])  # Sélection directe par numéro
+            [1-9])  # Sélection directe par numéro
                 local num=$((key - 1))
                 [[ $num -lt ${#MENU_OPTIONS[@]} ]] && selected=$num || true
                 ;;
@@ -317,6 +330,7 @@ show_help() {
     echo -e "  ${GREEN}--install${NC}      Installer / Réinstaller"
     echo -e "  ${GREEN}--uninstall${NC}    Désinstaller"
     echo -e "  ${GREEN}--reinstall${NC}    Désinstaller puis Réinstaller"
+    echo -e "  ${GREEN}--delete${NC}       Supprimer"
     echo -e "  ${GREEN}--reset${NC}        Supprimer puis Réinstaller"
     echo -e "  ${GREEN}--cache${NC}        Vider le cache"
     echo -e "  ${GREEN}--restart${NC}      Restart Docker Containers"
@@ -328,17 +342,29 @@ show_help() {
 # =============================================================================
 # Main
 # =============================================================================
+run_cli_action() {
+    local title=$1
+    local action=$2
+    echo ""
+    echo -e "${BOLD}${title}${NC}"
+    echo -e "${DIM}─────────────────────────${NC}"
+    $action
+    echo ""
+    success_msg "Terminé !"
+}
+
 cd "${SCRIPT_DIR}"
 check_prerequisites
 
 case "${1:-}" in
-    --install)     action_install_reinstall ;;
-    --uninstall)   action_uninstall ;;
-    --reinstall)   action_uninstall_reinstall ;;
-    --reset)       action_delete_reinstall ;;
-    --cache)       action_clear_cache ;;
-    --restart)     action_restart_docker ;;
-    --zip)         action_build_zip ;;
+    --install)     run_cli_action "Installer / Réinstaller" action_install_reinstall ;;
+    --uninstall)   run_cli_action "Désinstaller" action_uninstall ;;
+    --reinstall)   run_cli_action "Désinstaller puis Réinstaller" action_uninstall_reinstall ;;
+    --delete)      run_cli_action "Supprimer" action_delete ;;
+    --reset)       run_cli_action "Supprimer puis Réinstaller" action_delete_reinstall ;;
+    --cache)       run_cli_action "Vider le cache" action_clear_cache ;;
+    --restart)     run_cli_action "Restart Docker Containers" action_restart_docker ;;
+    --zip)         run_cli_action "Build ZIP" action_build_zip ;;
     --help|-h)     show_help ;;
     "")            run_menu ;;
     *)             error_msg "Option inconnue: $1. Utilisez --help pour l'aide." ;;
