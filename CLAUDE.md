@@ -380,48 +380,6 @@ MODULE_NAME="yourmodulename"                   # Module technical name (no space
 
 Run `./install.sh` without arguments to open the interactive menu:
 
-```
-╔══════════════════════════════════════════════╗
-║  Publiko Module Installer v1.1.0
-║  Module: yourmodulename v1.0.0
-╚══════════════════════════════════════════════╝
-
-  ▸ Installer / Réinstaller
-    Désinstaller
-    Désinstaller puis Réinstaller
-    Supprimer
-    Supprimer puis Réinstaller
-    Restaurer un backup
-    Vider le cache
-    Restart Docker Containers
-    Build ZIP
-    Quitter
-
-  ↑↓ Naviguer  ⏎ Valider  Echap/q Quitter
-```
-
-### Menu Options
-
-| Option | Description |
-|--------|-------------|
-| **Installer / Réinstaller** | Backup target, copy files to PrestaShop, run `install()`, clear cache |
-| **Désinstaller** | Run `uninstall()`, clear cache |
-| **Désinstaller puis Réinstaller** | Run `uninstall()`, backup, copy files, run `install()`, clear cache |
-| **Supprimer** | Run `uninstall()`, delete all files, clear cache |
-| **Supprimer puis Réinstaller** | Run `uninstall()`, delete files, backup, copy fresh files, run `install()`, clear cache |
-| **Restaurer un backup** | Interactive backup selection with arrow navigation, restore and clear cache |
-| **Vider le cache** | Clear PrestaShop cache only |
-| **Restart Docker Containers** | Run `docker compose down && docker compose up -d` |
-| **Build ZIP** | Generate distribution ZIP file |
-
-### Backup System
-
-The script automatically backs up the target directory before each sync operation:
-- Backups stored in `.backups/` folder (in the project source directory)
-- Format: `YYYY-MM-DD_HH-MM-SS`
-- Automatic rotation: keeps only the 5 most recent backups
-- Restore via interactive menu with arrow key navigation
-
 ### CLI Options
 
 ```bash
