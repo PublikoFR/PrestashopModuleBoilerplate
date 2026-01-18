@@ -360,53 +360,75 @@ private function uninstallDB()
 </div>
 ```
 
-## Build Script (build.sh)
+## Install Script (install.sh)
 
-A `build.sh` script must ALWAYS be created and kept up to date with the module structure:
+The `install.sh` script handles module installation, synchronization, and building. It provides an interactive menu and CLI options.
+
+### Configuration for a New Module
+
+When creating a new module from this boilerplate, update these variables at the top of `install.sh`:
 
 ```bash
-#!/bin/bash
-
-# Module name
-MODULE_NAME="mymodule"
-VERSION=$(grep "this->version" ${MODULE_NAME}.php | cut -d"'" -f4)
-ZIP_NAME="${MODULE_NAME}_v${VERSION}.zip"
-
-# Cleanup
-rm -f ${ZIP_NAME}
-
-# List of files and folders to include
-# IMPORTANT: Update this list if the structure changes
-zip -r ${ZIP_NAME} \
-    ${MODULE_NAME}.php \
-    index.php \
-    logo.png \
-    config.xml \
-    README.md \
-    translations/ \
-    views/ \
-    controllers/ \
-    classes/ \
-    sql/ \
-    upgrade/ \
-    -x "*.git*" "*.DS_Store" "*build.sh" "*Claude.md" "*.zip"
-
-echo "✓ Module packaged: ${ZIP_NAME}"
-ls -lh ${ZIP_NAME}
+# =============================================================================
+# Configuration - À MODIFIER pour chaque nouveau module
+# =============================================================================
+PRESTASHOP_PATH="/path/to/your/prestashop"    # Path to local PrestaShop
+DOCKER_CONTAINER="your_container_name"         # Docker container name
+MODULE_NAME="yourmodulename"                   # Module technical name (no spaces)
 ```
 
-### Using the build script
+### Interactive Menu
+
+Run `./install.sh` without arguments to open the interactive menu:
+
+```
+╔══════════════════════════════════════════════╗
+║  yourmodulename v1.0.0
+╚══════════════════════════════════════════════╝
+
+  ▸ Installer / Réinstaller
+    Désinstaller
+    Désinstaller puis Réinstaller
+    Supprimer puis Réinstaller
+    Vider le cache
+    Restart Docker Containers
+    Build ZIP
+    Quitter
+
+  ↑↓ Naviguer  ⏎ Valider  q Quitter
+```
+
+### Menu Options
+
+| Option | Description |
+|--------|-------------|
+| **Installer / Réinstaller** | Copy files to PrestaShop, run `install()`, clear cache |
+| **Désinstaller** | Run `uninstall()`, clear cache |
+| **Désinstaller puis Réinstaller** | Run `uninstall()`, copy files, run `install()`, clear cache |
+| **Supprimer puis Réinstaller** | Run `uninstall()`, delete all files, copy fresh files, run `install()`, clear cache |
+| **Vider le cache** | Clear PrestaShop cache only |
+| **Restart Docker Containers** | Run `docker compose down && docker compose up -d` |
+| **Build ZIP** | Generate distribution ZIP file |
+
+### CLI Options
+
+```bash
+./install.sh --install      # Installer / Réinstaller
+./install.sh --uninstall    # Désinstaller
+./install.sh --reinstall    # Désinstaller puis Réinstaller
+./install.sh --reset        # Supprimer puis Réinstaller
+./install.sh --cache        # Vider le cache
+./install.sh --restart      # Restart Docker Containers
+./install.sh --zip          # Build ZIP
+./install.sh --help         # Show help
+```
+
+### First Time Setup
+
 ```bash
 # Make the script executable (one time only)
-chmod +x build.sh
+chmod +x install.sh
 ```
-
-```bash
-# Generate the module ZIP
-./build.sh
-```
-
-**IMPORTANT**: If files/folders are added or removed in the module, update the list in the `build.sh` script.
 
 ## Testing and Validation
 
