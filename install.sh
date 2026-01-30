@@ -5,7 +5,7 @@ set -e
 # Script info
 # =============================================================================
 SCRIPT_NAME="Prestashop Docker Toolbox"
-SCRIPT_VERSION="1.2.3"
+SCRIPT_VERSION="1.2.5"
 
 # GitHub repository for auto-update (owner/repo format)
 GITHUB_REPO="PublikoFR/PrestashopDockerToolbox"
@@ -98,10 +98,11 @@ check_for_update() {
 
     info_msg "Checking for updates..."
 
-    # Fetch latest tag from GitHub API
+    # Fetch latest tag from GitHub API (portable grep without -P)
     LATEST_VERSION=$(curl -s --connect-timeout 5 "https://api.github.com/repos/${GITHUB_REPO}/tags" 2>/dev/null \
-        | grep -oP '"name":\s*"\K[0-9]+\.[0-9]+\.[0-9]+' \
-        | head -1 || echo "")
+        | grep -o '"name": *"[0-9.]*"' \
+        | head -1 \
+        | sed 's/[^0-9.]//g' || echo "")
 
     if [[ -z "$LATEST_VERSION" ]]; then
         error_msg "Unable to check for updates (no connection or no tags?)"
@@ -326,6 +327,19 @@ action_restart_docker() {
     success_msg "Containers restarted"
 }
 
+action_update_translations() {
+    local script_path="${SCRIPT_DIR}/generate_translations.php"
+
+    if [[ ! -f "$script_path" ]]; then
+        error_msg "generate_translations.php not found"
+        return 1
+    fi
+
+    cd "${SOURCE_DIR}"
+    php "$script_path" --stats-only
+    cd "${SCRIPT_DIR}"
+}
+
 action_build_zip() {
     local zip_name="${NAME}_v${ITEM_VERSION}.zip"
     local temp_dir=$(mktemp -d)
@@ -507,6 +521,11 @@ action_theme_delete_reinstall() {
 # =============================================================================
 # Interactive menu
 # =============================================================================
+
+# Check if translation script exists
+HAS_TRANSLATION_SCRIPT=false
+[[ -f "${SCRIPT_DIR}/generate_translations.php" ]] && HAS_TRANSLATION_SCRIPT=true
+
 if [[ "$TYPE" == "module" ]]; then
     MENU_OPTIONS=(
         "Install / Reinstall"
@@ -518,10 +537,13 @@ if [[ "$TYPE" == "module" ]]; then
         "Clear cache"
         "Restart Docker Containers"
         "Build ZIP"
-        "Update script"
-        "Quit"
     )
-    MENU_QUIT_INDEX=10
+    # Add translation option if script exists
+    if [[ "$HAS_TRANSLATION_SCRIPT" == true ]]; then
+        MENU_OPTIONS+=("Update translations hash")
+    fi
+    MENU_OPTIONS+=("Update script" "Quit")
+    MENU_QUIT_INDEX=$((${#MENU_OPTIONS[@]} - 1))
 else
     MENU_OPTIONS=(
         "Sync files"
@@ -566,33 +588,26 @@ print_menu() {
 
 execute_menu_action() {
     local selected=$1
+    local action_name="${MENU_OPTIONS[$selected]}"
 
-    if [[ "$TYPE" == "module" ]]; then
-        case $selected in
-            0) action_module_install ;;
-            1) action_module_uninstall ;;
-            2) action_module_uninstall_reinstall ;;
-            3) action_module_delete ;;
-            4) action_module_delete_reinstall ;;
-            5) action_restore ;;
-            6) action_clear_cache ;;
-            7) action_restart_docker ;;
-            8) action_build_zip ;;
-            9) action_update_script ;;
-        esac
-    else
-        case $selected in
-            0) action_theme_sync ;;
-            1) action_theme_sync_enable ;;
-            2) action_theme_delete ;;
-            3) action_theme_delete_reinstall ;;
-            4) action_restore ;;
-            5) action_clear_cache ;;
-            6) action_restart_docker ;;
-            7) action_build_zip ;;
-            8) action_update_script ;;
-        esac
-    fi
+    # Use action name for matching (more robust with dynamic menu)
+    case "$action_name" in
+        "Install / Reinstall")       action_module_install ;;
+        "Uninstall")                 action_module_uninstall ;;
+        "Uninstall then Reinstall")  action_module_uninstall_reinstall ;;
+        "Delete")                    action_module_delete ;;
+        "Delete then Reinstall")     action_module_delete_reinstall ;;
+        "Sync files")                action_theme_sync ;;
+        "Sync + Enable theme")       action_theme_sync_enable ;;
+        "Delete theme")              action_theme_delete ;;
+        "Delete + Reinstall")        action_theme_delete_reinstall ;;
+        "Restore a backup")          action_restore ;;
+        "Clear cache")               action_clear_cache ;;
+        "Restart Docker Containers") action_restart_docker ;;
+        "Build ZIP")                 action_build_zip ;;
+        "Update translations hash")  action_update_translations ;;
+        "Update script")             action_update_script ;;
+    esac
 }
 
 run_menu() {
@@ -709,6 +724,9 @@ show_help() {
         echo -e "  ${GREEN}--reinstall${NC}      Uninstall then Reinstall"
         echo -e "  ${GREEN}--delete${NC}         Delete"
         echo -e "  ${GREEN}--reset${NC}          Delete then Reinstall"
+        if [[ "$HAS_TRANSLATION_SCRIPT" == true ]]; then
+            echo -e "  ${GREEN}--translations${NC}   Update translations hash"
+        fi
     else
         echo -e "CLI Options (theme):"
         echo -e "  ${GREEN}--sync${NC}           Sync files"
@@ -753,6 +771,7 @@ if [[ "$TYPE" == "module" ]]; then
         --cache)         run_cli_action "Clear cache" action_clear_cache ;;
         --restart)       run_cli_action "Restart Docker Containers" action_restart_docker ;;
         --zip)           run_cli_action "Build ZIP" action_build_zip ;;
+        --translations)  run_cli_action "Update translations hash" action_update_translations ;;
         --update-script) run_cli_action "Update script" action_update_script ;;
         --help|-h)       show_help ;;
         "")              run_menu ;;
