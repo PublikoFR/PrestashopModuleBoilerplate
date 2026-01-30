@@ -130,12 +130,12 @@ echo -e "${CYAN}╔════════════════════�
 echo -e "${CYAN}║${NC}  ${BOLD}Preview of transformations${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
 echo ""
-printf "  %-25s ${DIM}→${NC} %s\n" "Human name:" "${BOLD}${MODULE_HUMAN}${NC}"
-printf "  %-25s ${DIM}→${NC} %s\n" "Technical (folder/file):" "${GREEN}${NEW_TECHNICAL}${NC}"
-printf "  %-25s ${DIM}→${NC} %s\n" "Class/Namespace:" "${GREEN}${NEW_CLASS}${NC}"
-printf "  %-25s ${DIM}→${NC} %s\n" "Smarty (mod='...'):" "${GREEN}${NEW_SMARTY}${NC}"
-printf "  %-25s ${DIM}→${NC} %s\n" "Twig domain:" "${GREEN}${NEW_TWIG}${NC}"
-printf "  %-25s ${DIM}→${NC} %s\n" "Composer package:" "${GREEN}${NEW_COMPOSER}${NC}"
+echo -e "  Human name:               ${DIM}→${NC} ${BOLD}${MODULE_HUMAN}${NC}"
+echo -e "  Technical (folder/file):  ${DIM}→${NC} ${GREEN}${NEW_TECHNICAL}${NC}"
+echo -e "  Class/Namespace:          ${DIM}→${NC} ${GREEN}${NEW_CLASS}${NC}"
+echo -e "  Smarty (mod='...'):       ${DIM}→${NC} ${GREEN}${NEW_SMARTY}${NC}"
+echo -e "  Twig domain:              ${DIM}→${NC} ${GREEN}${NEW_TWIG}${NC}"
+echo -e "  Composer package:         ${DIM}→${NC} ${GREEN}${NEW_COMPOSER}${NC}"
 echo ""
 
 # Check if target folder already exists
